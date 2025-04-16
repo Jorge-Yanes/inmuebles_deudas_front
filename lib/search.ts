@@ -22,18 +22,21 @@ export async function searchAssets(query: string): Promise<Asset[]> {
   // Search across all text fields
   return sampleAssets.filter((asset) => {
     return (
-      normalizeText(asset.title).includes(normalizedQuery) ||
-      normalizeText(asset.description).includes(normalizedQuery) ||
-      normalizeText(asset.location).includes(normalizedQuery) ||
-      normalizeText(asset.type).includes(normalizedQuery) ||
-      normalizeText(asset.status).includes(normalizedQuery) ||
-      normalizeText(asset.owner).includes(normalizedQuery) ||
+      normalizeText(asset.title ?? "").includes(normalizedQuery) ||
+      normalizeText(asset.description ?? "").includes(normalizedQuery) ||
+      normalizeText(asset.address ?? "").includes(normalizedQuery) ||
+      normalizeText(asset.legal_type ?? "").includes(normalizedQuery) ||
+      normalizeText(asset.legal_phase ?? "").includes(normalizedQuery) ||
       // Search in numeric fields by converting to string
-      asset.price
-        .toString()
+      asset.price_to_brokers
+        ?.toString()
         .includes(normalizedQuery) ||
-      asset.area.toString().includes(normalizedQuery) ||
-      asset.year.toString().includes(normalizedQuery)
+      asset.zip_code
+        ?.toString()
+        .includes(normalizedQuery) ||
+      asset.sqm
+        ?.toString()
+        .includes(normalizedQuery)
     )
   })
 }
@@ -53,17 +56,17 @@ export async function getSearchSuggestions(query: string): Promise<string[]> {
   // Extract suggestions from various fields
   sampleAssets.forEach((asset) => {
     // Add location suggestions
-    if (normalizeText(asset.location).includes(normalizedQuery)) {
-      suggestions.add(asset.location)
+    if (normalizeText(asset.address).includes(normalizedQuery)) {
+      suggestions.add(asset.address)
     }
 
     // Add type suggestions
-    if (normalizeText(asset.type).includes(normalizedQuery)) {
-      suggestions.add(asset.type)
+    if (normalizeText(asset.tipo_procedimiento ?? "").includes(normalizedQuery)) {
+      suggestions.add(asset.tipo_procedimiento ?? "")
     }
 
     // Add title word suggestions
-    asset.title.split(" ").forEach((word) => {
+    (asset.description ?? "").split(" ").forEach((word) => {
       if (normalizeText(word).includes(normalizedQuery) && word.length > 3) {
         suggestions.add(word)
       }

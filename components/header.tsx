@@ -43,7 +43,7 @@ export function Header() {
             <Link
               href="/"
               className="flex items-center gap-2 text-lg font-semibold"
-              onClick={() => document.querySelector("button[data-state='open']")?.click()}
+              onClick={() => (document.querySelector("button[data-state='open']") as HTMLButtonElement)?.click()}
             >
               <Building className="h-5 w-5" />
               Portal Inmobiliario
@@ -51,28 +51,28 @@ export function Header() {
             <Link
               href="/"
               className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent"
-              onClick={() => document.querySelector("button[data-state='open']")?.click()}
+              onClick={() => (document.querySelector("button[data-state='open']") as HTMLButtonElement)?.click()}
             >
               Dashboard
             </Link>
             <Link
               href="/assets"
               className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent"
-              onClick={() => document.querySelector("button[data-state='open']")?.click()}
+              onClick={() => (document.querySelector("button[data-state='open']") as HTMLButtonElement)?.click()}
             >
               Activos Inmobiliarios
             </Link>
             <Link
               href="/search"
               className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent"
-              onClick={() => document.querySelector("button[data-state='open']")?.click()}
+              onClick={() => (document.querySelector("button[data-state='open']") as HTMLButtonElement)?.click()}
             >
               Búsqueda Avanzada
             </Link>
             <Link
               href="/analytics"
               className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent"
-              onClick={() => document.querySelector("button[data-state='open']")?.click()}
+              onClick={() => (document.querySelector("button[data-state='open']") as HTMLButtonElement)?.click()}
             >
               Análisis
             </Link>

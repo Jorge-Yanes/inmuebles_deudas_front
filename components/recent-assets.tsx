@@ -69,7 +69,7 @@ export function RecentAssets() {
               <h3 className="text-xl font-semibold">{asset.title || `${propertyType} en ${asset.city}`}</h3>
               <div className="mt-2 flex items-center text-sm text-muted-foreground">
                 <MapPin className="mr-1 h-4 w-4" />
-                {asset.location || `${asset.city}, ${asset.province}`}
+                {asset.address || `${asset.city}, ${asset.province}`}
               </div>
               <div className="mt-1 flex items-center text-sm text-muted-foreground">
                 {asset.property_type === "RESIDENTIAL" ? (
