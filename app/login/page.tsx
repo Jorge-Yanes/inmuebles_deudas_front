@@ -18,7 +18,7 @@ export default function LoginPage() {
             <Building className="h-6 w-6 text-primary-foreground" />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">Bienvenido</h1>
-          <p className="text-sm text-muted-foreground">Ingrese sus credenciales para acceder al portal inmobiliario</p>
+          <p className="text-sm text-muted-foreground">Ingrese sus credenciales para acceder al portal inmobiliario.</p>
         </div>
         <LoginForm />
         <p className="px-8 text-center text-sm text-muted-foreground">
