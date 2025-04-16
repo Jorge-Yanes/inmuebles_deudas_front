@@ -12,7 +12,7 @@ interface AssetPageProps {
   }
 }
 
-export default function AssetPage({ params }: AssetPageProps) {
+export default function AssetPage({ params }: any) {
   return (
     <div className="flex flex-col gap-8 p-4 md:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

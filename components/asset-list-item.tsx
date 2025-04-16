@@ -83,13 +83,6 @@ export function AssetListItem({ asset }: AssetListItemProps) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Año</p>
-                <p className="text-sm font-medium">{asset.year || "N/A"}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
               <Badge variant="outline">{marketingStatus}</Badge>
             </div>
           </div>
