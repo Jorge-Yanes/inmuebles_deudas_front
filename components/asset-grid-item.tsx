@@ -1,5 +1,4 @@
 import Link from "next/link"
-import Image from "next/image"
 import { ArrowUpRight, Building, Home, MapPin } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
