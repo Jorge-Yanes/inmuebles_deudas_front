@@ -21,6 +21,8 @@ export function RegisterForm() {
     email: "",
     password: "",
     confirmPassword: "",
+    company: "",
+    phone: "",
   })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,8 +51,8 @@ export function RegisterForm() {
     }
 
     try {
-      await registerUser(formData.name, formData.email, formData.password)
-      router.push("/")
+      await registerUser(formData.name, formData.email, formData.password, formData.company, formData.phone)
+      router.push("/pending")
     } catch (err) {
       setError("Error al registrar usuario. El correo electrónico podría estar en uso.")
       setIsLoading(false)
@@ -88,6 +90,28 @@ export function RegisterForm() {
               value={formData.email}
               onChange={handleChange}
               required
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="company">Empresa (Opcional)</Label>
+            <Input
+              id="company"
+              name="company"
+              placeholder="Nombre de su empresa"
+              type="text"
+              value={formData.company}
+              onChange={handleChange}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="phone">Teléfono (Opcional)</Label>
+            <Input
+              id="phone"
+              name="phone"
+              placeholder="+34 600 000 000"
+              type="tel"
+              value={formData.phone}
+              onChange={handleChange}
             />
           </div>
           <div className="grid gap-2">

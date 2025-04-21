@@ -8,7 +8,7 @@ interface SearchPageProps {
   }
 }
 
-export default function SearchPage({ searchParams }: any) {
+export default function SearchPage({ searchParams }: SearchPageProps) {
   const query = searchParams.q || ""
 
   return (

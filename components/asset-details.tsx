@@ -5,6 +5,7 @@ import { Building, Home, MapPin, Ruler, User } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getAssetById } from "@/lib/firestore"
+import { useAuth } from "@/context/auth-context"
 import type { Asset } from "@/types/asset"
 import { formatCurrency, formatDate, marketingStatusLabels, propertyTypeLabels, legalPhaseLabels } from "@/types/asset"
 
@@ -13,8 +14,13 @@ interface AssetDetailsProps {
 }
 
 export function AssetDetails({ id }: AssetDetailsProps) {
+  const { checkPermission } = useAuth()
   const [asset, setAsset] = useState<Asset | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Check permissions
+  const canViewFinancialData = checkPermission("viewFinancialData")
+  const canViewLegalData = checkPermission("viewLegalData")
 
   useEffect(() => {
     const fetchAsset = async () => {
@@ -50,6 +56,11 @@ export function AssetDetails({ id }: AssetDetailsProps) {
     marketingStatusLabels[asset.marketing_status || "AVAILABLE"] || asset.marketing_status || "Disponible"
   const legalPhase = legalPhaseLabels[asset.legal_phase || ""] || asset.legal_phase
 
+  // Define available tabs based on permissions
+  const availableTabs = ["description", "details"]
+  if (canViewLegalData) availableTabs.push("legal")
+  if (canViewFinancialData) availableTabs.push("financial")
+
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2">
@@ -79,9 +90,21 @@ export function AssetDetails({ id }: AssetDetailsProps) {
           {asset.reference_code && (
             <div className="mt-1 text-sm text-muted-foreground">Ref: {asset.reference_code}</div>
           )}
-          <p className="mt-4 text-3xl font-bold">{formatCurrency(asset.price_approx)}</p>
-          {asset.auction_base && (
-            <p className="mt-1 text-sm text-muted-foreground">Base de subasta: {formatCurrency(asset.auction_base)}</p>
+
+          {/* Only show price if user has financial data permission */}
+          {canViewFinancialData ? (
+            <>
+              <p className="mt-4 text-3xl font-bold">{formatCurrency(asset.price_approx)}</p>
+              {asset.auction_base && (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Base de subasta: {formatCurrency(asset.auction_base)}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="mt-4 text-sm text-muted-foreground">
+              Contacte con un administrador para obtener información sobre el precio
+            </p>
           )}
 
           <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -123,13 +146,16 @@ export function AssetDetails({ id }: AssetDetailsProps) {
             )}
           </div>
 
-          <Tabs defaultValue="description" className="mt-6">
+          <Tabs defaultValue={availableTabs[0]} className="mt-6">
             <TabsList>
-              <TabsTrigger value="description">Descripción</TabsTrigger>
-              <TabsTrigger value="details">Detalles</TabsTrigger>
-              <TabsTrigger value="legal">Información Legal</TabsTrigger>
-              <TabsTrigger value="financial">Información Financiera</TabsTrigger>
+              {availableTabs.includes("description") && <TabsTrigger value="description">Descripción</TabsTrigger>}
+              {availableTabs.includes("details") && <TabsTrigger value="details">Detalles</TabsTrigger>}
+              {availableTabs.includes("legal") && <TabsTrigger value="legal">Información Legal</TabsTrigger>}
+              {availableTabs.includes("financial") && (
+                <TabsTrigger value="financial">Información Financiera</TabsTrigger>
+              )}
             </TabsList>
+
             <TabsContent value="description" className="mt-4">
               <p>
                 {asset.description ||
@@ -420,15 +446,22 @@ export function AssetDetails({ id }: AssetDetailsProps) {
               <span className="text-muted-foreground">Superficie</span>
               <span className="font-medium">{asset.sqm} m²</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Precio</span>
-              <span className="font-medium">{formatCurrency(asset.price_approx)}</span>
-            </div>
+
+            {/* Only show price if user has financial data permission */}
+            {canViewFinancialData && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Precio</span>
+                <span className="font-medium">{formatCurrency(asset.price_approx)}</span>
+              </div>
+            )}
+
             <div className="flex justify-between">
               <span className="text-muted-foreground">Estado</span>
               <span className="font-medium">{marketingStatus}</span>
             </div>
-            {asset.legal_phase && (
+
+            {/* Only show legal phase if user has legal data permission */}
+            {canViewLegalData && asset.legal_phase && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Fase legal</span>
                 <span className="font-medium">{legalPhase}</span>

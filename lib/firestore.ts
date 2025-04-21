@@ -41,7 +41,7 @@ export const sampleAssets: Asset[] = [
     property_general_subtype: "OFFICE",
     province: "Barcelona",
     city: "Barcelona",
-        cadastral_reference: "4529701TG3442H0010PA",
+    cadastral_reference: "4529701TG3442H0010PA",
     address: "Avenida Diagonal 405",
     zip_code: "08008",
     floor: "5",
@@ -113,7 +113,7 @@ export const sampleAssets: Asset[] = [
     property_type: "LAND",
     province: "Málaga",
     city: "Marbella",
-      cadastral_reference: "4529701TG3442H0010PA",
+    cadastral_reference: "4529701TG3442H0010PA",
     address: "Urbanización Costa del Sol, Parcela 25",
     zip_code: "29603",
     sqm: 1000,
@@ -164,7 +164,7 @@ export const sampleAssets: Asset[] = [
     address: "Polígono Industrial Zona Franca, Nave 12",
     zip_code: "08040",
     sqm: 500,
-        cadastral_reference: "4529701TG3442H0010PA",
+    cadastral_reference: "4529701TG3442H0010PA",
 
     extras: "Muelle de carga, oficinas, altura 8m",
     price_approx: 600000,
@@ -188,7 +188,7 @@ export const sampleAssets: Asset[] = [
     zip_code: "03004",
     floor: "4",
     door: "C",
-        cadastral_reference: "4529701TG3442H0010PA",
+    cadastral_reference: "4529701TG3442H0010PA",
 
     sqm: 75,
     rooms: 2,
@@ -211,7 +211,7 @@ export const sampleAssets: Asset[] = [
     property_type: "PARKING",
     province: "Madrid",
     city: "Madrid",
-        cadastral_reference: "4529701TG3442H0010PA",
+    cadastral_reference: "4529701TG3442H0010PA",
 
     address: "Calle Serrano 120",
     zip_code: "28006",
@@ -235,7 +235,7 @@ export const sampleAssets: Asset[] = [
     city: "Barcelona",
     address: "Calle Balmes 215",
     zip_code: "08006",
-        cadastral_reference: "4529701TG3442H0010PA",
+    cadastral_reference: "4529701TG3442H0010PA",
 
     sqm: 15,
     extras: "Trastero en sótano, acceso con ascensor",
@@ -261,7 +261,7 @@ export const sampleAssets: Asset[] = [
     sqm: 350,
     rooms: 5,
     bathrooms: 4,
-        cadastral_reference: "4529701TG3442H0010PA",
+    cadastral_reference: "4529701TG3442H0010PA",
 
     has_parking: 1,
     extras: "Piscina privada, jardín, vistas al mar, seguridad 24h",
@@ -291,7 +291,7 @@ export const sampleAssets: Asset[] = [
     extras: "Primera línea de playa, restaurante, piscina, terraza",
     price_approx: 5000000,
     auction_base: 4500000,
-        cadastral_reference: "4529701TG3442H0010PA",
+    cadastral_reference: "4529701TG3442H0010PA",
 
     legal_phase: "FORECLOSURE",
     marketing_status: "SUSPENDED",
@@ -440,4 +440,36 @@ export async function createAsset(assetData: Partial<Asset>) {
 
   // Devolver éxito
   return true
+}
+
+// Get all unique asset types
+export async function getAssetTypes(): Promise<string[]> {
+  // Simulate API delay
+  await new Promise((resolve) => setTimeout(resolve, 300))
+
+  // In a real implementation, you would query Firestore
+  return ["RESIDENTIAL", "COMMERCIAL", "INDUSTRIAL", "LAND", "PARKING", "STORAGE"]
+}
+
+// Get all unique portfolios
+export async function getPortfolios(): Promise<string[]> {
+  // Simulate API delay
+  await new Promise((resolve) => setTimeout(resolve, 300))
+
+  // In a real implementation, you would query Firestore
+  return ["Portfolio A", "Portfolio B", "Portfolio C", "Legacy Assets"]
+}
+
+// Add a function to check if a user has access to an asset
+export async function checkAssetAccess(userId: string, assetId: string): Promise<boolean> {
+  // In a real implementation, you would:
+  // 1. Get the user's permissions
+  // 2. Get the asset details
+  // 3. Check if the user has access based on asset type, province, portfolio, etc.
+
+  // For now, we'll simulate this check
+  await new Promise((resolve) => setTimeout(resolve, 200))
+
+  // Return true 80% of the time for demo purposes
+  return Math.random() > 0.2
 }
