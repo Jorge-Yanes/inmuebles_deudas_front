@@ -37,7 +37,7 @@ export function LoginForm() {
       await loginUser(formData.email, formData.password)
       router.push("/")
     } catch (err) {
-      setError("Credenciales inválidas. Por favor, inténtelo de nuevo.")
+      setError("Credenciales inválidas o usuario pendiente de activación. Por favor, inténtelo de nuevo o contacte con el administrador.")
       setIsLoading(false)
     }
   }
