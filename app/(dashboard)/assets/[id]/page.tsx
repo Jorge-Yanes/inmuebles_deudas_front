@@ -1,6 +1,6 @@
 import { Suspense } from "react"
 import Link from "next/link"
-import { ArrowLeft, Edit, Trash } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -29,16 +29,6 @@ export default async function AssetPage({ params }: AssetPageProps) {
             </Link>
           </Button>
           <h1 className="text-3xl font-bold tracking-tight">Detalles del Activo</h1>
-        </div>
-        <div className="flex gap-2">
-          <Button asChild variant="outline">
-            <Link href={`/assets/${params.id}/edit`}>
-              <Edit className="mr-2 h-4 w-4" /> Editar
-            </Link>
-          </Button>
-          <Button variant="destructive">
-            <Trash className="mr-2 h-4 w-4" /> Eliminar
-          </Button>
         </div>
       </div>
 

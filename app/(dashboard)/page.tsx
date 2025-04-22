@@ -28,7 +28,7 @@ export default function HomePage() {
         </Suspense>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Activos Inmobiliarios</CardTitle>
@@ -58,23 +58,6 @@ export default function HomePage() {
             <Button asChild variant="outline">
               <Link href="/analytics">
                 Ver Análisis <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardFooter>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Añadir Nuevo Activo</CardTitle>
-            <CardDescription>Registre una nueva propiedad en el sistema</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p>Complete el formulario para añadir un nuevo activo inmobiliario a su cartera.</p>
-          </CardContent>
-          <CardFooter>
-            <Button asChild variant="outline">
-              <Link href="/assets/new">
-                Añadir Activo <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           </CardFooter>
