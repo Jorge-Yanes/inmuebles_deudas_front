@@ -69,14 +69,7 @@ export function AssetDetails({ id }: AssetDetailsProps) {
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2">
         <div className="relative aspect-video overflow-hidden rounded-lg">
-          <ConditionalField
-            fieldName="cadastral_reference"
-            fallback={
-              <div className="w-full h-full flex items-center justify-center bg-muted">
-                <p className="text-muted-foreground text-center p-4">No tiene permisos para ver el mapa catastral</p>
-              </div>
-            }
-          >
+          <ConditionalField fieldName="cadastral_reference">
             {asset.cadastral_reference ? (
               <iframe
                 src={`https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?refcat=${asset.cadastral_reference}`}
@@ -91,6 +84,9 @@ export function AssetDetails({ id }: AssetDetailsProps) {
                 </p>
               </div>
             )}
+            <div className="w-full h-full flex items-center justify-center bg-muted">
+              <p className="text-muted-foreground text-center p-4">No tiene permisos para ver el mapa catastral</p>
+            </div>
           </ConditionalField>
         </div>
 

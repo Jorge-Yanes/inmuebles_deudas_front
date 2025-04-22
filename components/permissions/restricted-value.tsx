@@ -2,32 +2,28 @@
 
 import type React from "react"
 import { useFieldPermissions } from "@/context/field-permissions-context"
-import type { Asset } from "@/types/asset"
-import { getFieldMetadata } from "@/lib/permissions/field-permissions-service"
 import { LockIcon } from "lucide-react"
 
 interface RestrictedValueProps {
-  field: keyof Asset
+  fieldName: string
   value: React.ReactNode
   fallback?: React.ReactNode
 }
 
-export function RestrictedValue({ field, value, fallback }: RestrictedValueProps) {
+export function RestrictedValue({
+  fieldName,
+  value,
+  fallback = (
+    <span className="text-muted-foreground italic flex items-center gap-1">
+      <LockIcon className="h-3 w-3" /> Acceso restringido
+    </span>
+  ),
+}: RestrictedValueProps) {
   const { hasViewPermission } = useFieldPermissions()
-  const metadata = getFieldMetadata(field)
 
-  if (hasViewPermission(field)) {
-    return <>{value}</>
-  }
-
-  if (fallback) {
+  if (!hasViewPermission(fieldName)) {
     return <>{fallback}</>
   }
 
-  return (
-    <span className="flex items-center text-muted-foreground text-sm italic">
-      <LockIcon className="h-3 w-3 mr-1" />
-      {metadata?.sensitive ? "Información restringida" : "No disponible"}
-    </span>
-  )
+  return <>{value}</>
 }

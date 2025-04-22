@@ -2,21 +2,22 @@
 
 import type React from "react"
 import { useFieldPermissions } from "@/context/field-permissions-context"
-import type { Asset } from "@/types/asset"
 
 interface ConditionalFieldProps {
-  field: keyof Asset
+  fieldName: string
   children: React.ReactNode
   fallback?: React.ReactNode
-  editOnly?: boolean
+  requireEdit?: boolean
 }
 
-export function ConditionalField({ field, children, fallback = null, editOnly = false }: ConditionalFieldProps) {
+export function ConditionalField({ fieldName, children, fallback = null, requireEdit = false }: ConditionalFieldProps) {
   const { hasViewPermission, hasEditPermission } = useFieldPermissions()
 
-  if (editOnly) {
-    return hasEditPermission(field) ? <>{children}</> : <>{fallback}</>
+  const hasPermission = requireEdit ? hasEditPermission(fieldName) : hasViewPermission(fieldName)
+
+  if (!hasPermission) {
+    return <>{fallback}</>
   }
 
-  return hasViewPermission(field) ? <>{children}</> : <>{fallback}</>
+  return <>{children}</>
 }

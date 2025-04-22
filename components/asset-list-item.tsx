@@ -22,14 +22,7 @@ export function AssetListItem({ asset }: AssetListItemProps) {
     <Card className="overflow-hidden">
       <div className="flex flex-col md:flex-row">
         <div className="relative h-48 md:h-auto md:w-1/3 md:max-w-xs">
-          <ConditionalField
-            fieldName="cadastral_reference"
-            fallback={
-              <div className="w-full h-full flex items-center justify-center bg-muted">
-                <p className="text-muted-foreground text-center p-4">No tiene permisos para ver el mapa catastral</p>
-              </div>
-            }
-          >
+          <ConditionalField fieldName="cadastral_reference">
             {asset.cadastral_reference ? (
               <iframe
                 src={`https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?refcat=${asset.cadastral_reference}`}
@@ -44,6 +37,9 @@ export function AssetListItem({ asset }: AssetListItemProps) {
                 </p>
               </div>
             )}
+            <div className="w-full h-full flex items-center justify-center bg-muted">
+              <p className="text-muted-foreground text-center p-4">No tiene permisos para ver el mapa catastral</p>
+            </div>
           </ConditionalField>
 
           <Badge

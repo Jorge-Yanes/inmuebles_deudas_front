@@ -1,113 +1,72 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Loader2 } from "lucide-react"
-
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
+import { Loader2, Save, RefreshCw, AlertTriangle, Eye, Edit, EyeOff } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-
 import {
-  getAllRolesWithPermissions,
-  getFieldPermissionsByRole,
-  saveFieldPermissions,
-  getAllFieldCategories,
-  getFieldMetadataByCategory,
+  type FieldPermissions,
+  type FieldPermission,
+  FIELD_CATEGORIES,
+  getFieldsByCategory,
+  type FieldCategory,
+} from "@/types/field-permissions"
+import {
+  getFieldPermissionsForRole,
+  updateFieldPermissionsForRole,
+  resetFieldPermissionsForRole,
 } from "@/lib/permissions/field-permissions-service"
 
-import type { FieldPermission, FieldPermissionLevel, FieldCategory } from "@/types/field-permissions"
-
 export function FieldPermissionsManager() {
-  const router = useRouter()
   const { toast } = useToast()
-  const [roles, setRoles] = useState<string[]>([])
-  const [selectedRole, setSelectedRole] = useState<string>("")
-  const [permissions, setPermissions] = useState<FieldPermission[]>([])
-  const [categories, setCategories] = useState<FieldCategory[]>([])
+  const [selectedRole, setSelectedRole] = useState<string>("client")
+  const [permissions, setPermissions] = useState<FieldPermissions>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [activeCategory, setActiveCategory] = useState<FieldCategory | "all">("all")
+  const [activeCategory, setActiveCategory] = useState<FieldCategory>("identification")
+
+  const fieldsByCategory = getFieldsByCategory()
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const allRoles = await getAllRolesWithPermissions()
-        setRoles(allRoles)
+    loadPermissions(selectedRole)
+  }, [selectedRole])
 
-        if (allRoles.length > 0) {
-          setSelectedRole(allRoles[0])
-        }
-
-        const allCategories = getAllFieldCategories()
-        setCategories(allCategories)
-      } catch (error) {
-        console.error("Error fetching initial data:", error)
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los roles y categorías",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
+  const loadPermissions = async (role: string) => {
+    setLoading(true)
+    try {
+      const rolePermissions = await getFieldPermissionsForRole(role)
+      setPermissions(rolePermissions)
+    } catch (error) {
+      console.error("Error loading permissions:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los permisos",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
+  }
 
-    fetchData()
-  }, [toast])
-
-  useEffect(() => {
-    const fetchPermissions = async () => {
-      if (!selectedRole) return
-
-      setLoading(true)
-      try {
-        const rolePermissions = await getFieldPermissionsByRole(selectedRole)
-        setPermissions(rolePermissions)
-      } catch (error) {
-        console.error(`Error fetching permissions for role ${selectedRole}:`, error)
-        toast({
-          title: "Error",
-          description: `No se pudieron cargar los permisos para el rol ${selectedRole}`,
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchPermissions()
-  }, [selectedRole, toast])
-
-  const handlePermissionChange = (field: string, level: FieldPermissionLevel) => {
-    setPermissions((prevPermissions) => {
-      const newPermissions = [...prevPermissions]
-      const index = newPermissions.findIndex((p) => p.field === field)
-
-      if (index !== -1) {
-        newPermissions[index] = { ...newPermissions[index], level }
-      } else {
-        newPermissions.push({ field: field as keyof (typeof newPermissions)[0]["field"], level })
-      }
-
-      return newPermissions
-    })
+  const handlePermissionChange = (fieldName: string, permission: FieldPermission) => {
+    setPermissions((prev) => ({
+      ...prev,
+      [fieldName]: permission,
+    }))
   }
 
   const handleSave = async () => {
-    if (!selectedRole) return
-
     setSaving(true)
     try {
-      await saveFieldPermissions(selectedRole, permissions)
+      await updateFieldPermissionsForRole(selectedRole, permissions)
       toast({
-        title: "Permisos guardados",
+        title: "Permisos actualizados",
         description: `Los permisos para el rol ${selectedRole} han sido actualizados correctamente`,
       })
     } catch (error) {
@@ -122,132 +81,189 @@ export function FieldPermissionsManager() {
     }
   }
 
-  const renderFieldPermissions = (category: FieldCategory) => {
-    const fields = getFieldMetadataByCategory(category)
-
-    return (
-      <div className="space-y-6">
-        {fields.map((field) => (
-          <div key={field.field as string} className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-base font-medium flex items-center">
-                {field.label}
-                {field.sensitive && (
-                  <Badge variant="outline" className="ml-2 bg-red-50 text-red-700 hover:bg-red-50">
-                    Sensible
-                  </Badge>
-                )}
-              </Label>
-            </div>
-            <RadioGroup
-              value={permissions.find((p) => p.field === field.field)?.level || "none"}
-              onValueChange={(value) => handlePermissionChange(field.field as string, value as FieldPermissionLevel)}
-              className="flex space-x-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="none" id={`${field.field}-none`} />
-                <Label htmlFor={`${field.field}-none`} className="text-sm font-normal">
-                  Sin acceso
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="view" id={`${field.field}-view`} />
-                <Label htmlFor={`${field.field}-view`} className="text-sm font-normal">
-                  Ver
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="edit" id={`${field.field}-edit`} />
-                <Label htmlFor={`${field.field}-edit`} className="text-sm font-normal">
-                  Editar
-                </Label>
-              </div>
-            </RadioGroup>
-            {field.description && <p className="text-xs text-muted-foreground">{field.description}</p>}
-          </div>
-        ))}
-      </div>
-    )
+  const handleReset = async () => {
+    if (confirm(`¿Está seguro de que desea restablecer los permisos para el rol ${selectedRole}?`)) {
+      setSaving(true)
+      try {
+        await resetFieldPermissionsForRole(selectedRole)
+        await loadPermissions(selectedRole)
+        toast({
+          title: "Permisos restablecidos",
+          description: `Los permisos para el rol ${selectedRole} han sido restablecidos a los valores predeterminados`,
+        })
+      } catch (error) {
+        console.error("Error resetting permissions:", error)
+        toast({
+          title: "Error",
+          description: "No se pudieron restablecer los permisos",
+          variant: "destructive",
+        })
+      } finally {
+        setSaving(false)
+      }
+    }
   }
 
-  if (loading && roles.length === 0) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
+  const getPermissionBadge = (permission: FieldPermission) => {
+    switch (permission) {
+      case "view":
+        return (
+          <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+            <Eye className="mr-1 h-3 w-3" /> Ver
+          </Badge>
+        )
+      case "edit":
+        return (
+          <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100">
+            <Edit className="mr-1 h-3 w-3" /> Editar
+          </Badge>
+        )
+      case "none":
+        return (
+          <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-100">
+            <EyeOff className="mr-1 h-3 w-3" /> Sin acceso
+          </Badge>
+        )
+      default:
+        return null
+    }
   }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Gestión de Permisos de Campos</CardTitle>
-        <CardDescription>Configure qué campos pueden ver y editar los usuarios según su rol</CardDescription>
+        <CardDescription>Configure qué campos pueden ver y editar los diferentes roles de usuario</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="role">Rol</Label>
-            <Select value={selectedRole} onValueChange={setSelectedRole} disabled={loading || roles.length === 0}>
-              <SelectTrigger id="role" className="w-full sm:w-[300px]">
-                <SelectValue placeholder="Seleccionar rol" />
-              </SelectTrigger>
-              <SelectContent>
-                {roles.map((role) => (
-                  <SelectItem key={role} value={role}>
-                    {role.charAt(0).toUpperCase() + role.slice(1)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="flex flex-col gap-6">
+          <div className="flex items-center gap-4">
+            <div className="w-64">
+              <Label htmlFor="role-select">Seleccionar Rol</Label>
+              <Select value={selectedRole} onValueChange={setSelectedRole} disabled={loading || saving}>
+                <SelectTrigger id="role-select">
+                  <SelectValue placeholder="Seleccionar rol" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="client">Cliente</SelectItem>
+                  <SelectItem value="pending">Pendiente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-end gap-2">
+              <Button variant="outline" onClick={() => loadPermissions(selectedRole)} disabled={loading || saving}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Recargar
+              </Button>
+
+              <Button variant="destructive" onClick={handleReset} disabled={loading || saving}>
+                <AlertTriangle className="mr-2 h-4 w-4" />
+                Restablecer
+              </Button>
+            </div>
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
-            <Tabs
-              defaultValue="all"
-              value={activeCategory}
-              onValueChange={(value) => setActiveCategory(value as FieldCategory | "all")}
-            >
-              <TabsList className="mb-4 flex flex-wrap">
-                <TabsTrigger value="all">Todos</TabsTrigger>
-                {categories.map((category) => (
-                  <TabsTrigger key={category} value={category}>
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="md:col-span-1">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-medium">Categorías de Campos</h3>
+                  <p className="text-sm text-muted-foreground">Seleccione una categoría para gestionar sus permisos</p>
+                </div>
 
-              <TabsContent value="all" className="space-y-8">
-                {categories.map((category) => (
-                  <div key={category}>
-                    <h3 className="text-lg font-semibold mb-4">
-                      {category.charAt(0).toUpperCase() + category.slice(1)}
-                    </h3>
-                    {renderFieldPermissions(category)}
-                    <Separator className="my-6" />
-                  </div>
-                ))}
-              </TabsContent>
+                <div className="mt-3 space-y-1">
+                  {Object.entries(FIELD_CATEGORIES).map(([category, label]) => (
+                    <Button
+                      key={category}
+                      variant={activeCategory === category ? "default" : "ghost"}
+                      className="w-full justify-start"
+                      onClick={() => setActiveCategory(category as FieldCategory)}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
 
-              {categories.map((category) => (
-                <TabsContent key={category} value={category}>
-                  {renderFieldPermissions(category)}
-                </TabsContent>
-              ))}
-            </Tabs>
+              <div className="md:col-span-3">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-medium">{FIELD_CATEGORIES[activeCategory]}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Configure los permisos para cada campo en esta categoría
+                  </p>
+                </div>
+
+                <div className="mt-4 space-y-4">
+                  {fieldsByCategory[activeCategory].map((field) => (
+                    <div key={field.name} className="rounded-md border p-4">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-medium">{field.label}</h4>
+                            <p className="text-sm text-muted-foreground">{field.description}</p>
+                          </div>
+                          {field.sensitive && (
+                            <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
+                              <AlertTriangle className="mr-1 h-3 w-3" /> Sensible
+                            </Badge>
+                          )}
+                        </div>
+
+                        <Separator />
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`${field.name}-none`}
+                              checked={permissions[field.name] === "none"}
+                              onCheckedChange={() => handlePermissionChange(field.name, "none")}
+                            />
+                            <Label htmlFor={`${field.name}-none`} className="flex items-center">
+                              <EyeOff className="mr-1 h-4 w-4 text-red-500" /> Sin acceso
+                            </Label>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`${field.name}-view`}
+                              checked={permissions[field.name] === "view"}
+                              onCheckedChange={() => handlePermissionChange(field.name, "view")}
+                            />
+                            <Label htmlFor={`${field.name}-view`} className="flex items-center">
+                              <Eye className="mr-1 h-4 w-4 text-blue-500" /> Ver
+                            </Label>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`${field.name}-edit`}
+                              checked={permissions[field.name] === "edit"}
+                              onCheckedChange={() => handlePermissionChange(field.name, "edit")}
+                            />
+                            <Label htmlFor={`${field.name}-edit`} className="flex items-center">
+                              <Edit className="mr-1 h-4 w-4 text-green-500" /> Editar
+                            </Label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button variant="outline" onClick={() => router.back()}>
-          Cancelar
-        </Button>
-        <Button onClick={handleSave} disabled={saving || loading}>
-          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+      <CardFooter className="flex justify-end">
+        <Button onClick={handleSave} disabled={loading || saving}>
+          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Save className="mr-2 h-4 w-4" />
           Guardar Cambios
         </Button>
       </CardFooter>

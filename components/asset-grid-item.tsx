@@ -21,14 +21,7 @@ export function AssetGridItem({ asset }: AssetGridItemProps) {
   return (
     <Card className="overflow-hidden h-full flex flex-col">
       <div className="relative h-48">
-        <ConditionalField
-          fieldName="cadastral_reference"
-          fallback={
-            <div className="w-full h-full flex items-center justify-center bg-muted">
-              <p className="text-muted-foreground text-center p-4">No tiene permisos para ver el mapa catastral</p>
-            </div>
-          }
-        >
+        <ConditionalField fieldName="cadastral_reference">
           {asset.cadastral_reference ? (
             <iframe
               src={`https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?refcat=${asset.cadastral_reference}`}
@@ -43,6 +36,9 @@ export function AssetGridItem({ asset }: AssetGridItemProps) {
               </p>
             </div>
           )}
+          <div className="w-full h-full flex items-center justify-center bg-muted">
+            <p className="text-muted-foreground text-center p-4">No tiene permisos para ver el mapa catastral</p>
+          </div>
         </ConditionalField>
         <Badge className="absolute right-2 top-2" variant={marketingStatus === "Disponible" ? "default" : "secondary"}>
           {marketingStatus}

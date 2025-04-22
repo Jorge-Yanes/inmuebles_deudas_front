@@ -1,88 +1,84 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect } from "react"
-import type { FieldPermission } from "@/types/field-permissions"
-import { getFieldPermissionsByRole } from "@/lib/permissions/field-permissions-service"
+import { createContext, useContext, useEffect, useState } from "react"
+import { type FieldPermissions, DEFAULT_FIELD_PERMISSIONS } from "@/types/field-permissions"
+import { getFieldPermissionsForRole } from "@/lib/permissions/field-permissions-service"
 import { useAuth } from "@/context/auth-context"
-import type { Asset } from "@/types/asset"
+import type { User } from "@/types/user"
 
 interface FieldPermissionsContextType {
-  permissions: FieldPermission[]
+  fieldPermissions: FieldPermissions
   loading: boolean
-  hasViewPermission: (field: keyof Asset) => boolean
-  hasEditPermission: (field: keyof Asset) => boolean
+  hasViewPermission: (fieldName: string) => boolean
+  hasEditPermission: (fieldName: string) => boolean
   refreshPermissions: () => Promise<void>
 }
 
 const FieldPermissionsContext = createContext<FieldPermissionsContextType>({
-  permissions: [],
+  fieldPermissions: {},
   loading: true,
   hasViewPermission: () => false,
   hasEditPermission: () => false,
   refreshPermissions: async () => {},
 })
 
-export function useFieldPermissions() {
-  return useContext(FieldPermissionsContext)
-}
+export const useFieldPermissions = () => useContext(FieldPermissionsContext)
 
 export function FieldPermissionsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
-  const [permissions, setPermissions] = useState<FieldPermission[]>([])
+  const [fieldPermissions, setFieldPermissions] = useState<FieldPermissions>({})
   const [loading, setLoading] = useState(true)
 
-  const fetchPermissions = async () => {
-    if (!user) {
-      setPermissions([])
-      setLoading(false)
-      return
-    }
-
+  const loadPermissions = async (user: User | null) => {
+    setLoading(true)
     try {
-      const rolePermissions = await getFieldPermissionsByRole(user.role)
-      setPermissions(rolePermissions)
+      if (user) {
+        const permissions = await getFieldPermissionsForRole(user.role)
+        setFieldPermissions(permissions)
+      } else {
+        setFieldPermissions({})
+      }
     } catch (error) {
-      console.error("Error fetching field permissions:", error)
-      setPermissions([])
+      console.error("Error loading field permissions:", error)
+      // Fall back to default permissions
+      setFieldPermissions(user ? DEFAULT_FIELD_PERMISSIONS[user.role] || {} : {})
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchPermissions()
+    loadPermissions(user)
   }, [user])
 
-  const hasViewPermission = (field: keyof Asset) => {
+  const hasViewPermission = (fieldName: string): boolean => {
     if (!user) return false
 
-    // Admin has view access to all fields
+    // Admins can view all fields
     if (user.role === "admin") return true
 
-    const permission = permissions.find((p) => p.field === field)
-    return permission ? permission.level === "view" || permission.level === "edit" : false
+    const permission = fieldPermissions[fieldName]
+    return permission === "view" || permission === "edit"
   }
 
-  const hasEditPermission = (field: keyof Asset) => {
+  const hasEditPermission = (fieldName: string): boolean => {
     if (!user) return false
 
-    // Admin has edit access to all fields
+    // Admins can edit all fields
     if (user.role === "admin") return true
 
-    const permission = permissions.find((p) => p.field === field)
-    return permission ? permission.level === "edit" : false
+    return fieldPermissions[fieldName] === "edit"
   }
 
-  const refreshPermissions = async () => {
-    setLoading(true)
-    await fetchPermissions()
+  const refreshPermissions = async (): Promise<void> => {
+    await loadPermissions(user)
   }
 
   return (
     <FieldPermissionsContext.Provider
       value={{
-        permissions,
+        fieldPermissions,
         loading,
         hasViewPermission,
         hasEditPermission,

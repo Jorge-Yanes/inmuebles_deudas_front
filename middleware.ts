@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { getToken } from "next-auth/jwt"
-import { getFieldPermissionsByRole } from "@/lib/permissions/field-permissions-service"
+import { getFieldPermissionsForRole } from "@/lib/permissions/field-permissions-service"
 
 // This function can be marked `async` if using `await` inside
 export async function middleware(request: NextRequest) {
@@ -19,19 +19,13 @@ export async function middleware(request: NextRequest) {
     const role = token.role as string
 
     // Get the field permissions for the user's role
-    const fieldPermissions = await getFieldPermissionsByRole(role)
-
-    // Convert field permissions to a format suitable for the API
-    const permissionsMap: Record<string, string> = {}
-    fieldPermissions.forEach((permission) => {
-      permissionsMap[permission.field as string] = permission.level
-    })
+    const fieldPermissions = await getFieldPermissionsForRole(role)
 
     // Clone the request headers to add the permissions
     const requestHeaders = new Headers(request.headers)
 
     // Add the field permissions to the request headers
-    requestHeaders.set("x-field-permissions", JSON.stringify(permissionsMap))
+    requestHeaders.set("x-field-permissions", JSON.stringify(fieldPermissions))
 
     // Return the response with the modified headers
     return NextResponse.next({

@@ -11,35 +11,26 @@ import {
   type Timestamp,
   type DocumentData,
   type QueryDocumentSnapshot,
-  FirestoreError,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  serverTimestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Asset, AssetFilter } from "@/types/asset"
 import type { User } from "@/types/user"
-import { normalizeText, generateTitle, generateDescription } from "@/lib/utils"
+import { normalizeText } from "@/lib/utils"
 
 // Cache for property data to improve performance
-const propertyCache = new Map<string, Asset & { cacheTime: number }>()
+const propertyCache = new Map<string, Asset>()
 const CACHE_EXPIRY = 5 * 60 * 1000 // 5 minutes
 
-/**
- * Convert Firestore timestamp to Date
- */
+// Convert Firestore timestamp to Date
 const convertTimestamp = (timestamp: Timestamp | undefined): Date | undefined => {
   return timestamp ? timestamp.toDate() : undefined
 }
 
-/**
- * Convert Firestore document to Asset type
- */
-export const convertDocToAsset = (doc: QueryDocumentSnapshot<DocumentData>): Asset => {
+// Convert Firestore document to Asset type
+export const convertDocToAsset = (doc: DocumentData): Asset => {
   const data = doc.data()
 
-  // Handle potential data inconsistencies with default values
+  // Handle potential data inconsistencies
   const asset: Asset = {
     id: doc.id,
     ndg: data.ndg || "",
@@ -124,29 +115,19 @@ export const convertDocToAsset = (doc: QueryDocumentSnapshot<DocumentData>): Ass
     createdAt: convertTimestamp(data.createdAt) || new Date(),
   }
 
-  // Generate title and description if not provided
-  if (!asset.title) {
-    asset.title = generateTitle(asset)
-  }
-
-  if (!asset.description) {
-    asset.description = generateDescription(asset)
-  }
-
   return asset
 }
 
-/**
- * Get a single property by ID
- */
+// Get a single property by ID
 export async function getPropertyById(id: string, user?: User | null): Promise<Asset | null> {
   try {
     // Check cache first
     if (propertyCache.has(id)) {
       const cachedData = propertyCache.get(id)!
+      const cacheTime = cachedData.cacheTime as unknown as number
 
       // Return cached data if it's still valid
-      if (Date.now() - cachedData.cacheTime < CACHE_EXPIRY) {
+      if (cacheTime && Date.now() - cacheTime < CACHE_EXPIRY) {
         return cachedData
       }
     }
@@ -157,21 +138,23 @@ export async function getPropertyById(id: string, user?: User | null): Promise<A
       return null
     }
 
-    const asset = convertDocToAsset(propertyDoc as unknown as QueryDocumentSnapshot<DocumentData>)
+    const asset = convertDocToAsset(propertyDoc)
 
     // Add to cache with timestamp
-    propertyCache.set(id, { ...asset, cacheTime: Date.now() })
+    const assetWithCache = {
+      ...asset,
+      cacheTime: Date.now(),
+    }
+    propertyCache.set(id, assetWithCache)
 
     return asset
   } catch (error) {
     console.error("Error fetching property:", error)
-    throw new Error(error instanceof FirestoreError ? error.message : "Failed to fetch property details")
+    throw new Error("Failed to fetch property details")
   }
 }
 
-/**
- * Get properties with pagination and filtering
- */
+// Get properties with pagination and filtering
 export async function getProperties(
   filters?: AssetFilter,
   pageSize = 10,
@@ -179,46 +162,46 @@ export async function getProperties(
   user?: User | null,
 ): Promise<{ properties: Asset[]; lastVisible: QueryDocumentSnapshot<DocumentData> | null }> {
   try {
-    const propertiesRef = collection(db, "inmuebles")
-    const queryConstraints: any[] = []
+    const propertiesQuery = collection(db, "inmuebles")
+    const constraints: any[] = []
 
     // Apply filters if provided
     if (filters) {
       if (filters.property_type && filters.property_type !== "ALL") {
-        queryConstraints.push(where("property_type", "==", filters.property_type))
+        constraints.push(where("property_type", "==", filters.property_type))
       }
 
       if (filters.marketing_status && filters.marketing_status !== "ALL") {
-        queryConstraints.push(where("marketing_status", "==", filters.marketing_status))
+        constraints.push(where("marketing_status", "==", filters.marketing_status))
       }
 
       if (filters.legal_phase && filters.legal_phase !== "ALL") {
-        queryConstraints.push(where("legal_phase", "==", filters.legal_phase))
+        constraints.push(where("legal_phase", "==", filters.legal_phase))
       }
 
       if (filters.province && filters.province !== "ALL") {
-        queryConstraints.push(where("province", "==", filters.province))
+        constraints.push(where("province", "==", filters.province))
       }
 
       if (filters.city && filters.city !== "ALL") {
-        queryConstraints.push(where("city", "==", filters.city))
+        constraints.push(where("city", "==", filters.city))
       }
 
       // Note: For range queries (price, sqm), we'd need composite indexes in Firestore
-      // For simplicity, we'll filter these client-side after fetching
+      // For simplicity, we'll filter these client-side
     }
 
     // Add sorting and pagination
-    queryConstraints.push(orderBy("createdAt", "desc"))
+    constraints.push(orderBy("createdAt", "desc"))
 
     if (lastVisible) {
-      queryConstraints.push(startAfter(lastVisible))
+      constraints.push(startAfter(lastVisible))
     }
 
-    queryConstraints.push(limit(pageSize))
+    constraints.push(limit(pageSize))
 
     // Execute query
-    const q = query(propertiesRef, ...queryConstraints)
+    const q = query(propertiesQuery, ...constraints)
     const querySnapshot = await getDocs(q)
 
     // Process results
@@ -280,13 +263,11 @@ export async function getProperties(
     return { properties, lastVisible: newLastVisible }
   } catch (error) {
     console.error("Error fetching properties:", error)
-    throw new Error(error instanceof FirestoreError ? error.message : "Failed to fetch properties")
+    throw new Error("Failed to fetch properties")
   }
 }
 
-/**
- * Get unique values for a specific field
- */
+// Get unique values for filters
 export async function getUniqueFieldValues(field: string): Promise<string[]> {
   try {
     const querySnapshot = await getDocs(collection(db, "inmuebles"))
@@ -306,9 +287,7 @@ export async function getUniqueFieldValues(field: string): Promise<string[]> {
   }
 }
 
-/**
- * Get property statistics
- */
+// Get property statistics
 export async function getPropertyStats(userId?: string): Promise<{
   totalProperties: number
   totalValue: number
@@ -354,9 +333,7 @@ export async function getPropertyStats(userId?: string): Promise<{
   }
 }
 
-/**
- * Search properties by text query
- */
+// Search properties by text query
 export async function searchProperties(query: string): Promise<Asset[]> {
   try {
     if (!query.trim()) {
@@ -394,147 +371,5 @@ export async function searchProperties(query: string): Promise<Asset[]> {
   } catch (error) {
     console.error("Error searching properties:", error)
     return []
-  }
-}
-
-/**
- * Get recent properties
- */
-export async function getRecentProperties(limit = 3, user?: User | null): Promise<Asset[]> {
-  try {
-    const propertiesRef = collection(db, "inmuebles")
-    const q = query(propertiesRef, orderBy("createdAt", "desc"), limit(limit))
-    const querySnapshot = await getDocs(q)
-
-    const properties: Asset[] = []
-    querySnapshot.forEach((doc) => {
-      properties.push(convertDocToAsset(doc))
-    })
-
-    return properties
-  } catch (error) {
-    console.error("Error fetching recent properties:", error)
-    throw new Error(error instanceof FirestoreError ? error.message : "Failed to fetch recent properties")
-  }
-}
-
-/**
- * Create a new property
- */
-export async function createProperty(propertyData: Partial<Asset>): Promise<string> {
-  try {
-    const propertyRef = collection(db, "inmuebles")
-
-    // Add createdAt timestamp
-    const dataToSave = {
-      ...propertyData,
-      createdAt: serverTimestamp(),
-    }
-
-    const docRef = await addDoc(propertyRef, dataToSave)
-    return docRef.id
-  } catch (error) {
-    console.error("Error creating property:", error)
-    throw new Error(error instanceof FirestoreError ? error.message : "Failed to create property")
-  }
-}
-
-/**
- * Update an existing property
- */
-export async function updateProperty(id: string, propertyData: Partial<Asset>): Promise<void> {
-  try {
-    const propertyRef = doc(db, "inmuebles", id)
-
-    // Remove id from data to update
-    const { id: _, ...dataToUpdate } = propertyData
-
-    await updateDoc(propertyRef, dataToUpdate)
-
-    // Clear cache for this property
-    if (propertyCache.has(id)) {
-      propertyCache.delete(id)
-    }
-  } catch (error) {
-    console.error("Error updating property:", error)
-    throw new Error(error instanceof FirestoreError ? error.message : "Failed to update property")
-  }
-}
-
-/**
- * Delete a property
- */
-export async function deleteProperty(id: string): Promise<void> {
-  try {
-    const propertyRef = doc(db, "inmuebles", id)
-    await deleteDoc(propertyRef)
-
-    // Clear cache for this property
-    if (propertyCache.has(id)) {
-      propertyCache.delete(id)
-    }
-  } catch (error) {
-    console.error("Error deleting property:", error)
-    throw new Error(error instanceof FirestoreError ? error.message : "Failed to delete property")
-  }
-}
-
-/**
- * Check if a user has access to a property
- */
-export async function checkPropertyAccess(userId: string, propertyId: string): Promise<boolean> {
-  try {
-    // In a real implementation, you would:
-    // 1. Get the user's permissions
-    // 2. Get the property details
-    // 3. Check if the user has access based on property type, province, portfolio, etc.
-
-    // For now, we'll implement a basic check
-    const propertyDoc = await getDoc(doc(db, "inmuebles", propertyId))
-
-    if (!propertyDoc.exists()) {
-      return false
-    }
-
-    // Get user document to check permissions
-    const userDoc = await getDoc(doc(db, "users", userId))
-
-    if (!userDoc.exists()) {
-      return false
-    }
-
-    const userData = userDoc.data()
-    const propertyData = propertyDoc.data()
-
-    // Admin has access to everything
-    if (userData.role === "admin") {
-      return true
-    }
-
-    // Check if user has access to this type of property
-    if (userData.allowedAssetTypes && userData.allowedAssetTypes.length > 0) {
-      if (!userData.allowedAssetTypes.includes(propertyData.property_type)) {
-        return false
-      }
-    }
-
-    // Check if user has access to this province
-    if (userData.allowedProvinces && userData.allowedProvinces.length > 0) {
-      if (!userData.allowedProvinces.includes(propertyData.province)) {
-        return false
-      }
-    }
-
-    // Check if user has access to this portfolio
-    if (userData.allowedPortfolios && userData.allowedPortfolios.length > 0 && propertyData.portfolio) {
-      if (!userData.allowedPortfolios.includes(propertyData.portfolio)) {
-        return false
-      }
-    }
-
-    return true
-  } catch (error) {
-    console.error("Error checking property access:", error)
-    return false
   }
 }

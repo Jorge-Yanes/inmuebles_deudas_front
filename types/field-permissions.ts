@@ -1,27 +1,30 @@
-import type { Asset } from "@/types/asset"
+// Define the field permission types
+export type FieldPermission = "view" | "edit" | "none"
 
-// Permission levels for fields
-export type FieldPermissionLevel = "view" | "edit" | "none"
-
-// Field permission configuration for a specific field
-export interface FieldPermission {
-  field: keyof Asset
-  level: FieldPermissionLevel
+// Define the field permission structure
+export interface FieldPermissions {
+  [fieldName: string]: FieldPermission
 }
 
-// Field metadata for UI display and categorization
+// Define the role-based field permissions
+export interface RoleFieldPermissions {
+  [role: string]: FieldPermissions
+}
+
+// Define the field metadata for UI display
 export interface FieldMetadata {
-  field: keyof Asset
+  name: string
   label: string
+  description: string
   category: FieldCategory
+  type: FieldType
   sensitive: boolean
-  description?: string
 }
 
-// Categories for grouping fields
+// Field categories for grouping in the UI
 export type FieldCategory =
   | "identification"
-  | "basic"
+  | "property"
   | "location"
   | "physical"
   | "financial"
@@ -30,224 +33,384 @@ export type FieldCategory =
   | "dates"
   | "additional"
 
-// Role-based field permissions
-export interface RoleFieldPermissions {
-  role: string
-  permissions: FieldPermission[]
-}
+// Field types for validation and rendering
+export type FieldType = "string" | "number" | "date" | "boolean" | "enum"
 
-// For use in API routes
-export type FieldPermissions = Record<string, FieldPermissionLevel>
-
-// Default field permissions by role
-export const DEFAULT_FIELD_PERMISSIONS: Record<string, FieldPermission[]> = {
-  admin: [
-    // Admin has view and edit access to all fields
-    { field: "id", level: "view" },
-    { field: "ndg", level: "edit" },
-    { field: "lien", level: "edit" },
-    { field: "property_id", level: "edit" },
-    { field: "reference_code", level: "edit" },
-    { field: "parcel", level: "edit" },
-    { field: "cadastral_reference", level: "edit" },
-    { field: "property_idh", level: "edit" },
-    { field: "property_bank_id", level: "edit" },
-    { field: "alt_id1", level: "edit" },
-    { field: "idufir", level: "edit" },
-    { field: "id_portal_subasta", level: "edit" },
-    { field: "property_type", level: "edit" },
-    { field: "property_general_subtype", level: "edit" },
-    { field: "title", level: "edit" },
-    { field: "description", level: "edit" },
-    { field: "province", level: "edit" },
-    { field: "city", level: "edit" },
-    { field: "address", level: "edit" },
-    { field: "numero", level: "edit" },
-    { field: "street_type", level: "edit" },
-    { field: "street_no", level: "edit" },
-    { field: "zip_code", level: "edit" },
-    { field: "floor", level: "edit" },
-    { field: "door", level: "edit" },
-    { field: "comarca", level: "edit" },
-    { field: "sqm", level: "edit" },
-    { field: "rooms", level: "edit" },
-    { field: "bathrooms", level: "edit" },
-    { field: "has_parking", level: "edit" },
-    { field: "extras", level: "edit" },
-    { field: "gbv", level: "edit" },
-    { field: "auction_base", level: "edit" },
-    { field: "deuda", level: "edit" },
-    { field: "auction_value", level: "edit" },
-    { field: "price_approx", level: "edit" },
-    { field: "price_to_brokers", level: "edit" },
-    { field: "ob", level: "edit" },
-    { field: "legal_type", level: "edit" },
-    { field: "legal_phase", level: "edit" },
-    { field: "tipo_procedimiento", level: "edit" },
-    { field: "fase_procedimiento", level: "edit" },
-    { field: "fase_actual", level: "edit" },
-    { field: "registration_status", level: "edit" },
-    { field: "working_status", level: "edit" },
-    { field: "marketing_status", level: "edit" },
-    { field: "marketing_suspended_reason", level: "edit" },
-    { field: "estado_posesion_fisica", level: "edit" },
-    { field: "closing_date", level: "edit" },
-    { field: "portfolio_closing_date", level: "edit" },
-    { field: "date_under_re_mgmt", level: "edit" },
-    { field: "fecha_subasta", level: "edit" },
-    { field: "fecha_cesion_remate", level: "edit" },
-    { field: "campania", level: "edit" },
-    { field: "portfolio", level: "edit" },
-    { field: "borrower_name", level: "edit" },
-    { field: "hip_under_re_mgmt", level: "edit" },
-    { field: "reference_code_1", level: "edit" },
-    { field: "imageUrl", level: "edit" },
-    { field: "features", level: "edit" },
-    { field: "documents", level: "edit" },
-    { field: "history", level: "edit" },
-    { field: "createdAt", level: "view" },
-  ],
-  client: [
-    // Clients have limited access
-    { field: "id", level: "view" },
-    { field: "reference_code", level: "view" },
-    { field: "property_type", level: "view" },
-    { field: "property_general_subtype", level: "view" },
-    { field: "title", level: "view" },
-    { field: "description", level: "view" },
-    { field: "province", level: "view" },
-    { field: "city", level: "view" },
-    { field: "address", level: "view" },
-    { field: "zip_code", level: "view" },
-    { field: "floor", level: "view" },
-    { field: "door", level: "view" },
-    { field: "sqm", level: "view" },
-    { field: "rooms", level: "view" },
-    { field: "bathrooms", level: "view" },
-    { field: "has_parking", level: "view" },
-    { field: "extras", level: "view" },
-    { field: "marketing_status", level: "view" },
-    { field: "imageUrl", level: "view" },
-    { field: "features", level: "view" },
-    { field: "cadastral_reference", level: "view" },
-    { field: "createdAt", level: "view" },
-
-    // Financial fields are restricted by default
-    { field: "price_approx", level: "none" },
-    { field: "auction_base", level: "none" },
-    { field: "deuda", level: "none" },
-    { field: "auction_value", level: "none" },
-    { field: "price_to_brokers", level: "none" },
-    { field: "gbv", level: "none" },
-    { field: "ob", level: "none" },
-
-    // Legal fields are restricted by default
-    { field: "legal_type", level: "none" },
-    { field: "legal_phase", level: "none" },
-    { field: "tipo_procedimiento", level: "none" },
-    { field: "fase_procedimiento", level: "none" },
-    { field: "fase_actual", level: "none" },
-
-    // Dates are restricted by default
-    { field: "closing_date", level: "none" },
-    { field: "portfolio_closing_date", level: "none" },
-    { field: "date_under_re_mgmt", level: "none" },
-    { field: "fecha_subasta", level: "none" },
-    { field: "fecha_cesion_remate", level: "none" },
-
-    // Additional fields are restricted by default
-    { field: "borrower_name", level: "none" },
-    { field: "documents", level: "none" },
-    { field: "history", level: "none" },
-  ],
-  pending: [
-    // Pending users have no access
-    { field: "id", level: "none" },
-  ],
-}
-
-// Field metadata for UI display
-export const FIELD_METADATA: FieldMetadata[] = [
+// Define the property fields with metadata
+export const PROPERTY_FIELDS: Record<string, FieldMetadata> = {
   // Identification fields
-  { field: "id", label: "ID", category: "identification", sensitive: false },
-  { field: "ndg", label: "NDG", category: "identification", sensitive: true },
-  { field: "lien", label: "Lien", category: "identification", sensitive: true },
-  { field: "property_id", label: "ID de Propiedad", category: "identification", sensitive: false },
-  { field: "reference_code", label: "Código de Referencia", category: "identification", sensitive: false },
-  { field: "parcel", label: "Parcela", category: "identification", sensitive: false },
-  { field: "cadastral_reference", label: "Referencia Catastral", category: "identification", sensitive: false },
-  { field: "property_idh", label: "ID de Propiedad (H)", category: "identification", sensitive: true },
-  { field: "property_bank_id", label: "ID de Banco", category: "identification", sensitive: true },
-  { field: "alt_id1", label: "ID Alternativo", category: "identification", sensitive: true },
-  { field: "idufir", label: "IDUFIR", category: "identification", sensitive: true },
-  { field: "id_portal_subasta", label: "ID Portal Subasta", category: "identification", sensitive: true },
+  ndg: {
+    name: "ndg",
+    label: "NDG",
+    description: "Número de Gestión",
+    category: "identification",
+    type: "string",
+    sensitive: false,
+  },
+  lien: {
+    name: "lien",
+    label: "Lien",
+    description: "Número de gravamen",
+    category: "identification",
+    type: "number",
+    sensitive: false,
+  },
+  property_id: {
+    name: "property_id",
+    label: "ID de Propiedad",
+    description: "Identificador único de la propiedad",
+    category: "identification",
+    type: "number",
+    sensitive: false,
+  },
+  reference_code: {
+    name: "reference_code",
+    label: "Código de Referencia",
+    description: "Código de referencia de la propiedad",
+    category: "identification",
+    type: "string",
+    sensitive: false,
+  },
+  parcel: {
+    name: "parcel",
+    label: "Parcela",
+    description: "Número de parcela",
+    category: "identification",
+    type: "string",
+    sensitive: false,
+  },
+  cadastral_reference: {
+    name: "cadastral_reference",
+    label: "Referencia Catastral",
+    description: "Referencia catastral de la propiedad",
+    category: "identification",
+    type: "string",
+    sensitive: false,
+  },
 
-  // Basic property information
-  { field: "property_type", label: "Tipo de Propiedad", category: "basic", sensitive: false },
-  { field: "property_general_subtype", label: "Subtipo de Propiedad", category: "basic", sensitive: false },
-  { field: "title", label: "Título", category: "basic", sensitive: false },
-  { field: "description", label: "Descripción", category: "basic", sensitive: false },
+  // Property information
+  property_type: {
+    name: "property_type",
+    label: "Tipo de Propiedad",
+    description: "Tipo principal de la propiedad",
+    category: "property",
+    type: "enum",
+    sensitive: false,
+  },
+  property_general_subtype: {
+    name: "property_general_subtype",
+    label: "Subtipo de Propiedad",
+    description: "Subtipo de la propiedad",
+    category: "property",
+    type: "enum",
+    sensitive: false,
+  },
 
-  // Location information
-  { field: "province", label: "Provincia", category: "location", sensitive: false },
-  { field: "city", label: "Ciudad", category: "location", sensitive: false },
-  { field: "address", label: "Dirección", category: "location", sensitive: false },
-  { field: "numero", label: "Número", category: "location", sensitive: false },
-  { field: "street_type", label: "Tipo de Vía", category: "location", sensitive: false },
-  { field: "street_no", label: "Número de Calle", category: "location", sensitive: false },
-  { field: "zip_code", label: "Código Postal", category: "location", sensitive: false },
-  { field: "floor", label: "Planta", category: "location", sensitive: false },
-  { field: "door", label: "Puerta", category: "location", sensitive: false },
-  { field: "comarca", label: "Comarca", category: "location", sensitive: false },
+  // Location fields
+  province: {
+    name: "province",
+    label: "Provincia",
+    description: "Provincia donde se ubica la propiedad",
+    category: "location",
+    type: "string",
+    sensitive: false,
+  },
+  city: {
+    name: "city",
+    label: "Ciudad",
+    description: "Ciudad donde se ubica la propiedad",
+    category: "location",
+    type: "string",
+    sensitive: false,
+  },
+  address: {
+    name: "address",
+    label: "Dirección",
+    description: "Dirección completa de la propiedad",
+    category: "location",
+    type: "string",
+    sensitive: false,
+  },
+  zip_code: {
+    name: "zip_code",
+    label: "Código Postal",
+    description: "Código postal de la ubicación",
+    category: "location",
+    type: "string",
+    sensitive: false,
+  },
 
   // Physical characteristics
-  { field: "sqm", label: "Metros Cuadrados", category: "physical", sensitive: false },
-  { field: "rooms", label: "Habitaciones", category: "physical", sensitive: false },
-  { field: "bathrooms", label: "Baños", category: "physical", sensitive: false },
-  { field: "has_parking", label: "Plaza de Garaje", category: "physical", sensitive: false },
-  { field: "extras", label: "Extras", category: "physical", sensitive: false },
+  sqm: {
+    name: "sqm",
+    label: "Metros Cuadrados",
+    description: "Superficie en metros cuadrados",
+    category: "physical",
+    type: "number",
+    sensitive: false,
+  },
+  rooms: {
+    name: "rooms",
+    label: "Habitaciones",
+    description: "Número de habitaciones",
+    category: "physical",
+    type: "number",
+    sensitive: false,
+  },
+  bathrooms: {
+    name: "bathrooms",
+    label: "Baños",
+    description: "Número de baños",
+    category: "physical",
+    type: "number",
+    sensitive: false,
+  },
+  has_parking: {
+    name: "has_parking",
+    label: "Plaza de Garaje",
+    description: "Indica si la propiedad tiene plaza de garaje",
+    category: "physical",
+    type: "boolean",
+    sensitive: false,
+  },
+  extras: {
+    name: "extras",
+    label: "Extras",
+    description: "Características adicionales de la propiedad",
+    category: "physical",
+    type: "string",
+    sensitive: false,
+  },
 
   // Financial information
-  { field: "gbv", label: "Valor Bruto", category: "financial", sensitive: true },
-  { field: "auction_base", label: "Base de Subasta", category: "financial", sensitive: true },
-  { field: "deuda", label: "Deuda", category: "financial", sensitive: true },
-  { field: "auction_value", label: "Valor de Subasta", category: "financial", sensitive: true },
-  { field: "price_approx", label: "Precio Aproximado", category: "financial", sensitive: true },
-  { field: "price_to_brokers", label: "Precio para Intermediarios", category: "financial", sensitive: true },
-  { field: "ob", label: "OB", category: "financial", sensitive: true },
+  gbv: {
+    name: "gbv",
+    label: "Valor Bruto",
+    description: "Valor bruto de la propiedad",
+    category: "financial",
+    type: "number",
+    sensitive: true,
+  },
+  auction_base: {
+    name: "auction_base",
+    label: "Base de Subasta",
+    description: "Precio base para la subasta",
+    category: "financial",
+    type: "number",
+    sensitive: true,
+  },
+  deuda: {
+    name: "deuda",
+    label: "Deuda",
+    description: "Deuda asociada a la propiedad",
+    category: "financial",
+    type: "number",
+    sensitive: true,
+  },
+  auction_value: {
+    name: "auction_value",
+    label: "Valor de Subasta",
+    description: "Valor final de la subasta",
+    category: "financial",
+    type: "number",
+    sensitive: true,
+  },
+  price_approx: {
+    name: "price_approx",
+    label: "Precio Aproximado",
+    description: "Precio aproximado de la propiedad",
+    category: "financial",
+    type: "number",
+    sensitive: true,
+  },
+  price_to_brokers: {
+    name: "price_to_brokers",
+    label: "Precio para Intermediarios",
+    description: "Precio ofrecido a intermediarios",
+    category: "financial",
+    type: "number",
+    sensitive: true,
+  },
+  ob: {
+    name: "ob",
+    label: "OB",
+    description: "Valor OB",
+    category: "financial",
+    type: "number",
+    sensitive: true,
+  },
 
   // Legal information
-  { field: "legal_type", label: "Tipo Legal", category: "legal", sensitive: true },
-  { field: "legal_phase", label: "Fase Legal", category: "legal", sensitive: true },
-  { field: "tipo_procedimiento", label: "Tipo de Procedimiento", category: "legal", sensitive: true },
-  { field: "fase_procedimiento", label: "Fase de Procedimiento", category: "legal", sensitive: true },
-  { field: "fase_actual", label: "Fase Actual", category: "legal", sensitive: true },
+  legal_type: {
+    name: "legal_type",
+    label: "Tipo Legal",
+    description: "Tipo legal de la propiedad",
+    category: "legal",
+    type: "string",
+    sensitive: true,
+  },
+  legal_phase: {
+    name: "legal_phase",
+    label: "Fase Legal",
+    description: "Fase legal actual de la propiedad",
+    category: "legal",
+    type: "enum",
+    sensitive: true,
+  },
+  tipo_procedimiento: {
+    name: "tipo_procedimiento",
+    label: "Tipo de Procedimiento",
+    description: "Tipo de procedimiento legal",
+    category: "legal",
+    type: "string",
+    sensitive: true,
+  },
+  fase_procedimiento: {
+    name: "fase_procedimiento",
+    label: "Fase de Procedimiento",
+    description: "Fase actual del procedimiento legal",
+    category: "legal",
+    type: "string",
+    sensitive: true,
+  },
+  fase_actual: {
+    name: "fase_actual",
+    label: "Fase Actual",
+    description: "Fase actual detallada",
+    category: "legal",
+    type: "string",
+    sensitive: true,
+  },
 
-  // Status information
-  { field: "registration_status", label: "Estado de Registro", category: "status", sensitive: false },
-  { field: "working_status", label: "Estado de Trabajo", category: "status", sensitive: false },
-  { field: "marketing_status", label: "Estado de Marketing", category: "status", sensitive: false },
-  { field: "marketing_suspended_reason", label: "Razón de Suspensión", category: "status", sensitive: false },
-  { field: "estado_posesion_fisica", label: "Estado de Posesión Física", category: "status", sensitive: false },
+  // Status fields
+  registration_status: {
+    name: "registration_status",
+    label: "Estado de Registro",
+    description: "Estado del registro de la propiedad",
+    category: "status",
+    type: "string",
+    sensitive: false,
+  },
+  working_status: {
+    name: "working_status",
+    label: "Estado de Trabajo",
+    description: "Estado de trabajo de la propiedad",
+    category: "status",
+    type: "string",
+    sensitive: false,
+  },
+  marketing_status: {
+    name: "marketing_status",
+    label: "Estado de Marketing",
+    description: "Estado de marketing de la propiedad",
+    category: "status",
+    type: "enum",
+    sensitive: false,
+  },
+  estado_posesion_fisica: {
+    name: "estado_posesion_fisica",
+    label: "Estado de Posesión Física",
+    description: "Estado de la posesión física de la propiedad",
+    category: "status",
+    type: "string",
+    sensitive: false,
+  },
 
   // Dates
-  { field: "closing_date", label: "Fecha de Cierre", category: "dates", sensitive: true },
-  { field: "portfolio_closing_date", label: "Fecha de Cierre de Cartera", category: "dates", sensitive: true },
-  { field: "date_under_re_mgmt", label: "Fecha Bajo Gestión", category: "dates", sensitive: true },
-  { field: "fecha_subasta", label: "Fecha de Subasta", category: "dates", sensitive: true },
-  { field: "fecha_cesion_remate", label: "Fecha de Cesión de Remate", category: "dates", sensitive: true },
-  { field: "createdAt", label: "Fecha de Creación", category: "dates", sensitive: false },
+  closing_date: {
+    name: "closing_date",
+    label: "Fecha de Cierre",
+    description: "Fecha de cierre de la operación",
+    category: "dates",
+    type: "date",
+    sensitive: true,
+  },
+  portfolio_closing_date: {
+    name: "portfolio_closing_date",
+    label: "Fecha de Cierre de Cartera",
+    description: "Fecha de cierre de la cartera",
+    category: "dates",
+    type: "date",
+    sensitive: true,
+  },
+  fecha_subasta: {
+    name: "fecha_subasta",
+    label: "Fecha de Subasta",
+    description: "Fecha programada para la subasta",
+    category: "dates",
+    type: "date",
+    sensitive: true,
+  },
 
   // Additional information
-  { field: "campania", label: "Campaña", category: "additional", sensitive: true },
-  { field: "portfolio", label: "Cartera", category: "additional", sensitive: true },
-  { field: "borrower_name", label: "Nombre del Prestatario", category: "additional", sensitive: true },
-  { field: "hip_under_re_mgmt", label: "Hipoteca Bajo Gestión", category: "additional", sensitive: true },
-  { field: "reference_code_1", label: "Código de Referencia 1", category: "additional", sensitive: true },
+  portfolio: {
+    name: "portfolio",
+    label: "Cartera",
+    description: "Cartera a la que pertenece la propiedad",
+    category: "additional",
+    type: "string",
+    sensitive: false,
+  },
+  borrower_name: {
+    name: "borrower_name",
+    label: "Nombre del Prestatario",
+    description: "Nombre del prestatario asociado",
+    category: "additional",
+    type: "string",
+    sensitive: true,
+  },
+}
 
-  // UI fields
-  { field: "imageUrl", label: "URL de Imagen", category: "basic", sensitive: false },
-  { field: "features", label: "Características", category: "physical", sensitive: false },
-  { field: "documents", label: "Documentos", category: "additional", sensitive: true },
-  { field: "history", label: "Historial", category: "additional", sensitive: true },
-]
+// Default field permissions for different roles
+export const DEFAULT_FIELD_PERMISSIONS: RoleFieldPermissions = {
+  admin: Object.keys(PROPERTY_FIELDS).reduce((acc, field) => {
+    acc[field] = "edit"
+    return acc
+  }, {} as FieldPermissions),
+
+  client: Object.keys(PROPERTY_FIELDS).reduce((acc, field) => {
+    const fieldMeta = PROPERTY_FIELDS[field]
+    // Clients can view non-sensitive fields by default
+    acc[field] = fieldMeta.sensitive ? "none" : "view"
+    return acc
+  }, {} as FieldPermissions),
+
+  pending: Object.keys(PROPERTY_FIELDS).reduce((acc, field) => {
+    acc[field] = "none"
+    return acc
+  }, {} as FieldPermissions),
+}
+
+// Group fields by category for the UI
+export const FIELD_CATEGORIES: Record<FieldCategory, string> = {
+  identification: "Identificación",
+  property: "Información de Propiedad",
+  location: "Ubicación",
+  physical: "Características Físicas",
+  financial: "Información Financiera",
+  legal: "Información Legal",
+  status: "Estados",
+  dates: "Fechas",
+  additional: "Información Adicional",
+}
+
+// Get fields grouped by category
+export function getFieldsByCategory(): Record<FieldCategory, FieldMetadata[]> {
+  const result: Record<FieldCategory, FieldMetadata[]> = {
+    identification: [],
+    property: [],
+    location: [],
+    physical: [],
+    financial: [],
+    legal: [],
+    status: [],
+    dates: [],
+    additional: [],
+  }
+
+  Object.values(PROPERTY_FIELDS).forEach((field) => {
+    result[field.category].push(field)
+  })
+
+  return result
+}

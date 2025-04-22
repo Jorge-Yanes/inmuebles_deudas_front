@@ -1,158 +1,106 @@
-import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore"
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import type { FieldPermission, FieldMetadata, FieldCategory } from "@/types/field-permissions"
-import { FIELD_METADATA, DEFAULT_FIELD_PERMISSIONS } from "@/types/field-permissions"
-import type { Asset } from "@/types/asset"
+import { type FieldPermissions, type RoleFieldPermissions, DEFAULT_FIELD_PERMISSIONS } from "@/types/field-permissions"
 import type { User } from "@/types/user"
 
-/**
- * Get field permissions for a specific role
- */
-export async function getFieldPermissionsByRole(role: string): Promise<FieldPermission[]> {
-  try {
-    const permissionsDoc = await getDoc(doc(db, "fieldPermissions", role))
+// Collection name for field permissions
+const FIELD_PERMISSIONS_COLLECTION = "fieldPermissions"
 
-    if (!permissionsDoc.exists()) {
-      // If no permissions are defined for this role, use defaults
-      return DEFAULT_FIELD_PERMISSIONS[role] || []
+// Get field permissions for a specific role
+export async function getFieldPermissionsForRole(role: string): Promise<FieldPermissions> {
+  try {
+    const permissionsDoc = await getDoc(doc(db, FIELD_PERMISSIONS_COLLECTION, role))
+
+    if (permissionsDoc.exists()) {
+      return permissionsDoc.data() as FieldPermissions
     }
 
-    return permissionsDoc.data().permissions as FieldPermission[]
+    // If no permissions are defined, use defaults
+    return DEFAULT_FIELD_PERMISSIONS[role] || {}
   } catch (error) {
     console.error(`Error fetching field permissions for role ${role}:`, error)
-    // Return default permissions as fallback
-    return DEFAULT_FIELD_PERMISSIONS[role] || []
+    return DEFAULT_FIELD_PERMISSIONS[role] || {}
   }
 }
 
-/**
- * Save field permissions for a specific role
- */
-export async function saveFieldPermissions(role: string, permissions: FieldPermission[]): Promise<void> {
+// Update field permissions for a role
+export async function updateFieldPermissionsForRole(role: string, permissions: FieldPermissions): Promise<void> {
   try {
-    await setDoc(doc(db, "fieldPermissions", role), {
-      role,
-      permissions,
-      updatedAt: new Date(),
-    })
-  } catch (error) {
-    console.error(`Error saving field permissions for role ${role}:`, error)
-    throw new Error(`Failed to save field permissions: ${error.message}`)
-  }
-}
+    const permissionsRef = doc(db, FIELD_PERMISSIONS_COLLECTION, role)
+    const permissionsDoc = await getDoc(permissionsRef)
 
-/**
- * Get all available roles with field permissions
- */
-export async function getAllRolesWithPermissions(): Promise<string[]> {
-  try {
-    const querySnapshot = await getDocs(collection(db, "fieldPermissions"))
-    const roles: string[] = []
-
-    querySnapshot.forEach((doc) => {
-      roles.push(doc.id)
-    })
-
-    // Add default roles if they don't exist in the database
-    const defaultRoles = Object.keys(DEFAULT_FIELD_PERMISSIONS)
-    for (const role of defaultRoles) {
-      if (!roles.includes(role)) {
-        roles.push(role)
-      }
+    if (permissionsDoc.exists()) {
+      await updateDoc(permissionsRef, permissions)
+    } else {
+      await setDoc(permissionsRef, permissions)
     }
-
-    return roles
   } catch (error) {
-    console.error("Error fetching roles with permissions:", error)
-    return Object.keys(DEFAULT_FIELD_PERMISSIONS)
+    console.error(`Error updating field permissions for role ${role}:`, error)
+    throw new Error("Failed to update field permissions")
   }
 }
 
-/**
- * Check if a user has permission to view a specific field
- */
+// Reset field permissions to defaults for a role
+export async function resetFieldPermissionsForRole(role: string): Promise<void> {
+  try {
+    if (DEFAULT_FIELD_PERMISSIONS[role]) {
+      await setDoc(doc(db, FIELD_PERMISSIONS_COLLECTION, role), DEFAULT_FIELD_PERMISSIONS[role])
+    } else {
+      throw new Error(`No default permissions defined for role: ${role}`)
+    }
+  } catch (error) {
+    console.error(`Error resetting field permissions for role ${role}:`, error)
+    throw new Error("Failed to reset field permissions")
+  }
+}
+
+// Check if a user has permission to view a specific field
 export function hasFieldViewPermission(
   user: User | null | undefined,
-  field: keyof Asset,
-  permissions?: FieldPermission[],
+  fieldName: string,
+  fieldPermissions?: FieldPermissions,
 ): boolean {
   if (!user) return false
 
-  // Admin has view access to all fields
+  // Admins can view all fields
   if (user.role === "admin") return true
 
-  if (!permissions) return false
+  // Use provided permissions or default to user's role permissions
+  const permissions = fieldPermissions || DEFAULT_FIELD_PERMISSIONS[user.role] || {}
 
-  const permission = permissions.find((p) => p.field === field)
-  return permission ? permission.level === "view" || permission.level === "edit" : false
+  return permissions[fieldName] === "view" || permissions[fieldName] === "edit"
 }
 
-/**
- * Check if a user has permission to edit a specific field
- */
+// Check if a user has permission to edit a specific field
 export function hasFieldEditPermission(
   user: User | null | undefined,
-  field: keyof Asset,
-  permissions?: FieldPermission[],
+  fieldName: string,
+  fieldPermissions?: FieldPermissions,
 ): boolean {
   if (!user) return false
 
-  // Admin has edit access to all fields
+  // Admins can edit all fields
   if (user.role === "admin") return true
 
-  if (!permissions) return false
+  // Use provided permissions or default to user's role permissions
+  const permissions = fieldPermissions || DEFAULT_FIELD_PERMISSIONS[user.role] || {}
 
-  const permission = permissions.find((p) => p.field === field)
-  return permission ? permission.level === "edit" : false
+  return permissions[fieldName] === "edit"
 }
 
-/**
- * Get field metadata by category
- */
-export function getFieldMetadataByCategory(category: FieldCategory): FieldMetadata[] {
-  return FIELD_METADATA.filter((metadata) => metadata.category === category)
-}
-
-/**
- * Get all field categories
- */
-export function getAllFieldCategories(): FieldCategory[] {
-  const categories = new Set<FieldCategory>()
-
-  FIELD_METADATA.forEach((metadata) => {
-    categories.add(metadata.category)
-  })
-
-  return Array.from(categories)
-}
-
-/**
- * Get metadata for a specific field
- */
-export function getFieldMetadata(field: keyof Asset): FieldMetadata | undefined {
-  return FIELD_METADATA.find((metadata) => metadata.field === field)
-}
-
-/**
- * Initialize default field permissions for all roles
- */
-export async function initializeDefaultFieldPermissions(): Promise<void> {
+// Get all field permissions for all roles
+export async function getAllFieldPermissions(): Promise<RoleFieldPermissions> {
   try {
     const roles = Object.keys(DEFAULT_FIELD_PERMISSIONS)
+    const permissions: RoleFieldPermissions = {}
 
     for (const role of roles) {
-      const permissionsDoc = await getDoc(doc(db, "fieldPermissions", role))
-
-      if (!permissionsDoc.exists()) {
-        await setDoc(doc(db, "fieldPermissions", role), {
-          role,
-          permissions: DEFAULT_FIELD_PERMISSIONS[role],
-          updatedAt: new Date(),
-        })
-      }
+      permissions[role] = await getFieldPermissionsForRole(role)
     }
+
+    return permissions
   } catch (error) {
-    console.error("Error initializing default field permissions:", error)
-    throw new Error(`Failed to initialize default field permissions: ${error.message}`)
+    console.error("Error fetching all field permissions:", error)
+    return DEFAULT_FIELD_PERMISSIONS
   }
 }
