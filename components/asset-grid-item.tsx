@@ -1,10 +1,11 @@
 import Link from "next/link"
-import Image from "next/image"
 import { ArrowUpRight, Building, Home, MapPin } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
+import { ConditionalField } from "@/components/permissions/conditional-field"
+import { RestrictedValue } from "@/components/permissions/restricted-value"
 import type { Asset } from "@/types/asset"
 import { formatCurrency, marketingStatusLabels, propertyTypeLabels } from "@/types/asset"
 
@@ -20,6 +21,14 @@ export function AssetGridItem({ asset }: AssetGridItemProps) {
   return (
     <Card className="overflow-hidden h-full flex flex-col">
       <div className="relative h-48">
+        <ConditionalField
+          fieldName="cadastral_reference"
+          fallback={
+            <div className="w-full h-full flex items-center justify-center bg-muted">
+              <p className="text-muted-foreground text-center p-4">No tiene permisos para ver el mapa catastral</p>
+            </div>
+          }
+        >
           {asset.cadastral_reference ? (
             <iframe
               src={`https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?refcat=${asset.cadastral_reference}`}
@@ -34,6 +43,7 @@ export function AssetGridItem({ asset }: AssetGridItemProps) {
               </p>
             </div>
           )}
+        </ConditionalField>
         <Badge className="absolute right-2 top-2" variant={marketingStatus === "Disponible" ? "default" : "secondary"}>
           {marketingStatus}
         </Badge>
@@ -54,10 +64,15 @@ export function AssetGridItem({ asset }: AssetGridItemProps) {
           )}
           {propertyType}
           {asset.sqm > 0 && ` · ${asset.sqm}m²`}
-          {asset.rooms && ` · ${asset.rooms} hab.`}
+          <ConditionalField fieldName="rooms">{asset.rooms && ` · ${asset.rooms} hab.`}</ConditionalField>
         </div>
-        <p className="mt-2 text-lg font-bold">{formatCurrency(asset.price_approx)}</p>
-        {asset.reference_code && <p className="mt-1 text-xs text-muted-foreground">Ref: {asset.reference_code}</p>}
+        <RestrictedValue
+          fieldName="price_approx"
+          value={<p className="mt-2 text-lg font-bold">{formatCurrency(asset.price_approx)}</p>}
+        />
+        <ConditionalField fieldName="reference_code">
+          {asset.reference_code && <p className="mt-1 text-xs text-muted-foreground">Ref: {asset.reference_code}</p>}
+        </ConditionalField>
       </CardContent>
       <CardFooter className="p-4 pt-0 mt-auto">
         <Button asChild variant="outline" className="w-full">

@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 
 import { AuthProvider } from "@/context/auth-context"
+import { FieldPermissionsProvider } from "@/context/field-permissions-context"
 import { ThemeProvider } from "@/components/theme-provider"
 
 import "./globals.css"
@@ -20,7 +21,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es">
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <FieldPermissionsProvider>{children}</FieldPermissionsProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

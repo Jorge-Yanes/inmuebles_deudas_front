@@ -16,8 +16,7 @@ interface AssetPageProps {
 
 export default async function AssetPage({ params }: AssetPageProps) {
   // Pre-fetch the asset to get its type, province, and portfolio
-  const { id } = await params; // Await params before using its properties
-  const asset = await getAssetById(id);
+  const asset = await getAssetById(params.id)
 
   return (
     <div className="flex flex-col gap-8 p-4 md:p-8">
@@ -31,17 +30,27 @@ export default async function AssetPage({ params }: AssetPageProps) {
           </Button>
           <h1 className="text-3xl font-bold tracking-tight">Detalles del Activo</h1>
         </div>
+        <div className="flex gap-2">
+          <Button asChild variant="outline">
+            <Link href={`/assets/${params.id}/edit`}>
+              <Edit className="mr-2 h-4 w-4" /> Editar
+            </Link>
+          </Button>
+          <Button variant="destructive">
+            <Trash className="mr-2 h-4 w-4" /> Eliminar
+          </Button>
+        </div>
       </div>
 
       <Suspense fallback={<Skeleton className="h-[500px] w-full" />}>
         <AssetAccessGuard
-          assetId={id} // Use the awaited id
+          assetId={params.id}
           assetType={asset?.property_type}
           province={asset?.province}
           portfolio={asset?.portfolio}
         >
-          <AssetDetails id={id} />
-         </AssetAccessGuard>
+          <AssetDetails id={params.id} />
+        </AssetAccessGuard>
       </Suspense>
     </div>
   )

@@ -58,7 +58,10 @@
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.6",
     "zod": "^3.24.1",
-    "firebase": "latest"
+    "@auth/core": "latest",
+    "nodemailer": "latest",
+    "firebase": "latest",
+    "next-auth": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
