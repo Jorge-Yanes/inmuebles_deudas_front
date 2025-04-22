@@ -123,7 +123,12 @@ export async function getCurrentUser(): Promise<User | null> {
 
 // Send password reset email
 export async function resetPassword(email: string): Promise<void> {
-  return sendPasswordResetEmail(auth, email)
+  try {
+    await sendPasswordResetEmail(auth, email)
+  } catch (error) {
+    console.error("Error sending password reset email:", error)
+    throw error
+  }
 }
 
 // Admin functions

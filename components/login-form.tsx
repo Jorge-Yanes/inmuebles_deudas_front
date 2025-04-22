@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { loginUser } from "@/lib/auth"
+import Link from "next/link" // Add this import
 
 export function LoginForm() {
   const router = useRouter()
@@ -64,7 +65,7 @@ export function LoginForm() {
             <div className="flex items-center justify-between">
               <Label htmlFor="password">Contraseña</Label>
               <Button variant="link" className="h-auto p-0 text-xs" asChild>
-                <a href="/forgot-password">¿Olvidó su contraseña?</a>
+                <Link href="/forgot-password">¿Olvidó su contraseña?</Link>
               </Button>
             </div>
             <div className="relative">

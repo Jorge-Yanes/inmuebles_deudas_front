@@ -11,16 +11,21 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { getRecentAssets } from "@/lib/firestore"
 import type { Asset } from "@/types/asset"
 import { formatCurrency, marketingStatusLabels, propertyTypeLabels } from "@/types/asset"
+import { useAuth } from "@/context/auth-context" // Add this import
 
 export function RecentAssets() {
+  const { user, checkPermission } = useAuth() // Get user and permission check function
   const [assets, setAssets] = useState<Asset[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchAssets = async () => {
       try {
-        const data = await getRecentAssets()
-        setAssets(data)
+        // Only fetch assets if user has permission to view assets
+        if (user && checkPermission("viewAssets")) {
+          const data = await getRecentAssets(user.id) // Pass user ID to filter assets by permission
+          setAssets(data)
+        }
       } catch (error) {
         console.error("Error fetching recent assets:", error)
       } finally {
@@ -29,10 +34,22 @@ export function RecentAssets() {
     }
 
     fetchAssets()
-  }, [])
+  }, [user, checkPermission]) // Add dependencies to re-fetch when user or permissions change
+
+  // Check if user has permission to view financial data
+  const canViewFinancialData = user && checkPermission("viewFinancialData")
 
   if (loading) {
     return <div className="text-center">Cargando activos recientes...</div>
+  }
+
+  if (!user || !checkPermission("viewAssets")) {
+    return (
+      <div className="rounded-lg border border-dashed p-8 text-center">
+        <h3 className="text-lg font-semibold">Acceso Restringido</h3>
+        <p className="mt-2 text-muted-foreground">No tiene permisos para ver activos inmobiliarios.</p>
+      </div>
+    )
   }
 
   if (assets.length === 0) {
@@ -79,7 +96,11 @@ export function RecentAssets() {
                 )}
                 {propertyType}
               </div>
-              <p className="mt-2 text-lg font-bold">{formatCurrency(asset.price_approx)}</p>
+              {canViewFinancialData ? (
+                <p className="mt-2 text-lg font-bold">{formatCurrency(asset.price_approx)}</p>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">Precio: Requiere permisos adicionales</p>
+              )}
             </CardContent>
             <CardFooter className="p-4 pt-0">
               <Button asChild variant="outline" className="w-full">

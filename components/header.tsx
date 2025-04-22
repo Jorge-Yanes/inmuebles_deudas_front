@@ -22,12 +22,15 @@ export function Header() {
   const pathname = usePathname()
 
   // Skip rendering on login and register pages
-  if (pathname === "/login" || pathname === "/register") {
+  if (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password") {
     return null
   }
 
   // Don't show search bar on search page
   const showSearchBar = !pathname.startsWith("/search")
+
+  // Check if we're in the admin section
+  const isAdminSection = pathname.startsWith("/admin")
 
   return (
     <header className="sticky top-0 z-50 flex h-16 w-full items-center border-b bg-background px-4 md:px-6">
@@ -41,86 +44,97 @@ export function Header() {
         <SheetContent side="left" className="w-[240px] sm:w-[300px]">
           <nav className="flex flex-col gap-4 py-4">
             <Link
-              href="/"
+              href={isAdminSection ? "/admin" : "/"}
               className="flex items-center gap-2 text-lg font-semibold"
               onClick={() => document.querySelector("button[data-state='open']")?.click()}
             >
               <Building className="h-5 w-5" />
-              Portal Inmobiliario
+              {isAdminSection ? "Panel de Administración" : "Portal Inmobiliario"}
             </Link>
-            <Link
-              href="/"
-              className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent"
-              onClick={() => document.querySelector("button[data-state='open']")?.click()}
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/assets"
-              className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent"
-              onClick={() => document.querySelector("button[data-state='open']")?.click()}
-            >
-              Activos Inmobiliarios
-            </Link>
-            <Link
-              href="/search"
-              className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent"
-              onClick={() => document.querySelector("button[data-state='open']")?.click()}
-            >
-              Búsqueda Avanzada
-            </Link>
-            <Link
-              href="/analytics"
-              className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent"
-              onClick={() => document.querySelector("button[data-state='open']")?.click()}
-            >
-              Análisis
-            </Link>
+
+            {isAdminSection ? (
+              // Admin navigation links
+              <>
+                <Link
+                  href="/admin"
+                  className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent"
+                  onClick={() => document.querySelector("button[data-state='open']")?.click()}
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  href="/admin/users"
+                  className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent"
+                  onClick={() => document.querySelector("button[data-state='open']")?.click()}
+                >
+                  Gestión de Usuarios
+                </Link>
+                <Link
+                  href="/admin/permissions"
+                  className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent"
+                  onClick={() => document.querySelector("button[data-state='open']")?.click()}
+                >
+                  Permisos y Roles
+                </Link>
+              </>
+            ) : (
+              // Client navigation links
+              <>
+                <Link
+                  href="/"
+                  className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent"
+                  onClick={() => document.querySelector("button[data-state='open']")?.click()}
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  href="/assets"
+                  className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent"
+                  onClick={() => document.querySelector("button[data-state='open']")?.click()}
+                >
+                  Activos Inmobiliarios
+                </Link>
+                <Link
+                  href="/search"
+                  className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent"
+                  onClick={() => document.querySelector("button[data-state='open']")?.click()}
+                >
+                  Búsqueda Avanzada
+                </Link>
+              </>
+            )}
+
+            {isAdminSection ? (
+              <Link
+                href="/"
+                className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent"
+                onClick={() => document.querySelector("button[data-state='open']")?.click()}
+              >
+                Volver al Portal
+              </Link>
+            ) : (
+              user?.role === "admin" && (
+                <Link
+                  href="/admin"
+                  className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent"
+                  onClick={() => document.querySelector("button[data-state='open']")?.click()}
+                >
+                  Panel de Administración
+                </Link>
+              )
+            )}
           </nav>
         </SheetContent>
       </Sheet>
 
-      <Link href="/" className="flex items-center gap-2 text-lg font-semibold lg:text-xl">
+      <Link href={isAdminSection ? "/admin" : "/"} className="flex items-center gap-2 text-lg font-semibold lg:text-xl">
         <Building className="h-5 w-5" />
-        <span className="hidden md:inline-block">Portal Inmobiliario</span>
+        <span className="hidden md:inline-block">
+          {isAdminSection ? "Panel de Administración" : "Portal Inmobiliario"}
+        </span>
       </Link>
 
-      <nav className="mx-6 hidden items-center gap-4 lg:flex lg:gap-6">
-        <Link
-          href="/"
-          className={`text-sm font-medium ${
-            pathname === "/" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Dashboard
-        </Link>
-        <Link
-          href="/assets"
-          className={`text-sm font-medium ${
-            pathname.startsWith("/assets") ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Activos Inmobiliarios
-        </Link>
-        <Link
-          href="/search"
-          className={`text-sm font-medium ${
-            pathname.startsWith("/search") ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Búsqueda Avanzada
-        </Link>
-        <Link
-          href="/analytics"
-          className={`text-sm font-medium ${
-            pathname.startsWith("/analytics") ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Análisis
-        </Link>
-      </nav>
-
-      {showSearchBar && (
+      {!isAdminSection && showSearchBar && (
         <div className="mx-auto hidden md:block">
           <SearchBar variant="minimal" />
         </div>
@@ -144,6 +158,25 @@ export function Header() {
               <DropdownMenuItem asChild>
                 <Link href="/settings">Configuración</Link>
               </DropdownMenuItem>
+
+              {user.role === "admin" && !isAdminSection && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin">Panel de Administración</Link>
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              {isAdminSection && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/">Volver al Portal</Link>
+                  </DropdownMenuItem>
+                </>
+              )}
+
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => logout()} className="text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />

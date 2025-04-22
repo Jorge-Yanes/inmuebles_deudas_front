@@ -302,13 +302,22 @@ export const sampleAssets: Asset[] = [
 ]
 
 // Obtener estadísticas de activos
-export async function getAssetStats() {
+export async function getAssetStats(userId?: string) {
   // Simular retraso de API
   await new Promise((resolve) => setTimeout(resolve, 500))
 
-  const totalAssets = sampleAssets.length
-  const totalValue = sampleAssets.reduce((sum, asset) => sum + (asset.price_approx || 0), 0)
-  const locations = new Set(sampleAssets.map((asset) => asset.city))
+  // If userId is provided, filter assets based on user permissions
+  const filteredAssets = [...sampleAssets]
+
+  if (userId) {
+    // In a real implementation, you would query Firestore to get user permissions
+    // and filter assets accordingly
+    // For now, we'll just use the sample assets
+  }
+
+  const totalAssets = filteredAssets.length
+  const totalValue = filteredAssets.reduce((sum, asset) => sum + (asset.price_approx || 0), 0)
+  const locations = new Set(filteredAssets.map((asset) => asset.city))
   const totalLocations = locations.size
   const averageValue = Math.round(totalValue / totalAssets)
 
@@ -321,12 +330,21 @@ export async function getAssetStats() {
 }
 
 // Obtener activos recientes
-export async function getRecentAssets() {
+export async function getRecentAssets(userId?: string) {
   // Simular retraso de API
   await new Promise((resolve) => setTimeout(resolve, 500))
 
+  // If userId is provided, filter assets based on user permissions
+  const filteredAssets = [...sampleAssets]
+
+  if (userId) {
+    // In a real implementation, you would query Firestore to get user permissions
+    // and filter assets accordingly
+    // For now, we'll just use the sample assets
+  }
+
   // Ordenar por createdAt y devolver los 3 más recientes
-  return [...sampleAssets]
+  return filteredAssets
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, 3)
     .map((asset) => ({

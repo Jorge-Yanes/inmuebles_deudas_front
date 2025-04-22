@@ -1,38 +1,19 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { Clock, Shield, User, Users } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { getAllUsers } from "@/lib/auth"
 
-export function AdminStats() {
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    activeUsers: 0,
-    pendingUsers: 0,
-    adminUsers: 0,
-  })
+interface AdminStatsProps {
+  stats: {
+    totalUsers: number
+    activeUsers: number
+    pendingUsers: number
+    adminUsers: number
+  }
+}
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const users = await getAllUsers()
-
-        setStats({
-          totalUsers: users.length,
-          activeUsers: users.filter((user) => user.role === "client").length,
-          pendingUsers: users.filter((user) => user.role === "pending").length,
-          adminUsers: users.filter((user) => user.role === "admin").length,
-        })
-      } catch (error) {
-        console.error("Error fetching user stats:", error)
-      }
-    }
-
-    fetchStats()
-  }, [])
-
+export function AdminStats({ stats }: AdminStatsProps) {
   return (
     <>
       <Card>

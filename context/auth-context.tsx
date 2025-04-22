@@ -66,6 +66,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const adminRoutes = ["/admin"]
     const isAdminRoute = adminRoutes.some((route) => pathname.startsWith(route))
 
+    // Client-only routes
+    const clientRoutes = ["/assets", "/search", "/analytics", "/settings"]
+    const isClientRoute = clientRoutes.some((route) => pathname.startsWith(route))
+
     // Redirect unauthenticated users to login
     if (!user && !isPublicRoute) {
       router.push("/login")
@@ -74,7 +78,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Redirect authenticated users away from public routes
     if (user && isPublicRoute) {
-      router.push("/")
+      if (user.role === "admin") {
+        router.push("/admin")
+      } else {
+        router.push("/")
+      }
       return
     }
 

@@ -8,10 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { getPendingUsers, approveUser, rejectUser } from "@/lib/auth"
 import type { User } from "@/types/user"
+import { useToast } from "@/hooks/use-toast"
 
 export function PendingUsersList() {
+  const { toast } = useToast()
   const [pendingUsers, setPendingUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [processingUsers, setProcessingUsers] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     const fetchPendingUsers = async () => {
@@ -20,31 +23,60 @@ export function PendingUsersList() {
         setPendingUsers(users)
       } catch (error) {
         console.error("Error fetching pending users:", error)
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los usuarios pendientes",
+          variant: "destructive",
+        })
       } finally {
         setLoading(false)
       }
     }
 
     fetchPendingUsers()
-  }, [])
+  }, [toast])
 
   const handleApproveUser = async (userId: string) => {
+    setProcessingUsers((prev) => ({ ...prev, [userId]: true }))
     try {
       await approveUser(userId)
       // Remove the user from the list
       setPendingUsers(pendingUsers.filter((user) => user.id !== userId))
+      toast({
+        title: "Usuario aprobado",
+        description: "El usuario ha sido aprobado correctamente",
+      })
     } catch (error) {
       console.error("Error approving user:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo aprobar el usuario",
+        variant: "destructive",
+      })
+    } finally {
+      setProcessingUsers((prev) => ({ ...prev, [userId]: false }))
     }
   }
 
   const handleRejectUser = async (userId: string) => {
+    setProcessingUsers((prev) => ({ ...prev, [userId]: true }))
     try {
       await rejectUser(userId)
       // Remove the user from the list
       setPendingUsers(pendingUsers.filter((user) => user.id !== userId))
+      toast({
+        title: "Usuario rechazado",
+        description: "El usuario ha sido rechazado correctamente",
+      })
     } catch (error) {
       console.error("Error rejecting user:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo rechazar el usuario",
+        variant: "destructive",
+      })
+    } finally {
+      setProcessingUsers((prev) => ({ ...prev, [userId]: false }))
     }
   }
 
@@ -98,6 +130,7 @@ export function PendingUsersList() {
                         size="sm"
                         className="text-green-600 hover:bg-green-50 hover:text-green-700"
                         onClick={() => handleApproveUser(user.id)}
+                        disabled={processingUsers[user.id]}
                       >
                         <CheckCircle className="mr-2 h-4 w-4" />
                         Aprobar
@@ -107,6 +140,7 @@ export function PendingUsersList() {
                         size="sm"
                         className="text-red-600 hover:bg-red-50 hover:text-red-700"
                         onClick={() => handleRejectUser(user.id)}
+                        disabled={processingUsers[user.id]}
                       >
                         <XCircle className="mr-2 h-4 w-4" />
                         Rechazar

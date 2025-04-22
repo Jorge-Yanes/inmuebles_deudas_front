@@ -8,12 +8,13 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { AssetStats } from "@/components/asset-stats"
 import { RecentAssets } from "@/components/recent-assets"
 import { SearchBar } from "@/components/search-bar"
+import { DashboardGreeting } from "@/components/dashboard-greeting" // New component
 
 export default function HomePage() {
   return (
     <div className="flex flex-col gap-8 p-4 md:p-8">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Portal Inmobiliario</h1>
+        <DashboardGreeting />
         <p className="text-muted-foreground">Gestione sus activos inmobiliarios de manera eficiente</p>
       </div>
 
