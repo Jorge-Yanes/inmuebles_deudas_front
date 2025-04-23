@@ -8,13 +8,13 @@ import { ArrowUpRight, Building, Home, MapPin } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
-import { getRecentAssets } from "@/lib/firestore"
+import { getProperties } from "@/lib/firestore/property-service"
 import type { Asset } from "@/types/asset"
 import { formatCurrency, marketingStatusLabels, propertyTypeLabels } from "@/types/asset"
-import { useAuth } from "@/context/auth-context" // Add this import
+import { useAuth } from "@/context/auth-context"
 
 export function RecentAssets() {
-  const { user, checkPermission } = useAuth() // Get user and permission check function
+  const { user, checkPermission } = useAuth()
   const [assets, setAssets] = useState<Asset[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -23,8 +23,14 @@ export function RecentAssets() {
       try {
         // Only fetch assets if user has permission to view assets
         if (user && checkPermission("viewAssets")) {
-          const data = await getRecentAssets(user.id) // Pass user ID to filter assets by permission
-          setAssets(data)
+          // Use getProperties with a limit of 3 and sort by createdAt desc
+          const result = await getProperties(
+            {}, // No filters
+            3, // Limit to 3 recent assets
+            undefined, // No pagination
+            user, // Pass user for permissions
+          )
+          setAssets(result.properties)
         }
       } catch (error) {
         console.error("Error fetching recent assets:", error)
@@ -34,7 +40,7 @@ export function RecentAssets() {
     }
 
     fetchAssets()
-  }, [user, checkPermission]) // Add dependencies to re-fetch when user or permissions change
+  }, [user, checkPermission])
 
   // Check if user has permission to view financial data
   const canViewFinancialData = user && checkPermission("viewFinancialData")

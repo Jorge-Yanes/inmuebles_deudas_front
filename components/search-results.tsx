@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { SearchBar } from "@/components/search-bar"
-import { searchAssets } from "@/lib/search"
+import { searchProperties } from "@/lib/firestore/property-service"
 import type { Asset } from "@/types/asset"
 import { ViewToggle, type ViewMode } from "@/components/view-toggle"
 import { AssetGridItem } from "@/components/asset-grid-item"
@@ -28,7 +28,7 @@ export function SearchResults({ query }: SearchResultsProps) {
           return
         }
 
-        const results = await searchAssets(searchQuery)
+        const results = await searchProperties(searchQuery)
         setAssets(results)
       } catch (error) {
         console.error("Error searching assets:", error)

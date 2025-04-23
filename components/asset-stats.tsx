@@ -4,13 +4,13 @@ import { useEffect, useState } from "react"
 import { Building, Home, MapPin, TrendingUp } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { getAssetStats } from "@/lib/firestore"
-import { useAuth } from "@/context/auth-context" // Add this import
+import { getPropertyStats } from "@/lib/firestore/property-service"
+import { useAuth } from "@/context/auth-context"
 
 export function AssetStats() {
-  const { user, checkPermission } = useAuth() // Get user and permission check function
+  const { user, checkPermission } = useAuth()
   const [stats, setStats] = useState({
-    totalAssets: 0,
+    totalProperties: 0,
     totalValue: 0,
     totalLocations: 0,
     averageValue: 0,
@@ -21,8 +21,13 @@ export function AssetStats() {
       try {
         // Only fetch stats if user has permission to view assets
         if (user && checkPermission("viewAssets")) {
-          const data = await getAssetStats(user.id) // Pass user ID to filter assets by permission
-          setStats(data)
+          const data = await getPropertyStats(user.id)
+          setStats({
+            totalAssets: data.totalProperties,
+            totalValue: data.totalValue,
+            totalLocations: data.totalLocations,
+            averageValue: data.averageValue,
+          })
         }
       } catch (error) {
         console.error("Error fetching asset stats:", error)
@@ -30,7 +35,7 @@ export function AssetStats() {
     }
 
     fetchStats()
-  }, [user, checkPermission]) // Add dependencies to re-fetch when user or permissions change
+  }, [user, checkPermission])
 
   // If user doesn't have permission to view financial data, hide financial stats
   const canViewFinancialData = user && checkPermission("viewFinancialData")
@@ -43,7 +48,7 @@ export function AssetStats() {
           <Building className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{stats.totalAssets}</div>
+          <div className="text-2xl font-bold">{stats.totalAssets || stats.totalProperties}</div>
           <p className="text-xs text-muted-foreground">Propiedades registradas</p>
         </CardContent>
       </Card>

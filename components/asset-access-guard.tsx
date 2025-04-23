@@ -9,7 +9,7 @@ import { ShieldAlert } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/context/auth-context"
-import { checkAssetAccess } from "@/lib/firestore"
+import { getPropertyById } from "@/lib/firestore/property-service"
 
 interface AssetAccessGuardProps {
   assetId: string
@@ -26,7 +26,7 @@ export function AssetAccessGuard({ assetId, assetType, province, portfolio, chil
   const [hasPermission, setHasPermission] = useState(false)
 
   useEffect(() => {
-    const checkPermission = async () => {
+    const checkAssetPermission = async () => {
       if (!user) {
         setHasPermission(false)
         setLoading(false)
@@ -54,10 +54,10 @@ export function AssetAccessGuard({ assetId, assetType, province, portfolio, chil
         return
       }
 
-      // Check specific asset access (e.g., based on additional rules in Firestore)
+      // Check specific asset access by trying to fetch it
       try {
-        const access = await checkAssetAccess(user.id, assetId)
-        setHasPermission(access)
+        const asset = await getPropertyById(assetId, user)
+        setHasPermission(asset !== null)
       } catch (error) {
         console.error("Error checking asset access:", error)
         setHasPermission(false)
@@ -66,7 +66,7 @@ export function AssetAccessGuard({ assetId, assetType, province, portfolio, chil
       }
     }
 
-    checkPermission()
+    checkAssetPermission()
   }, [user, assetId, assetType, province, portfolio, hasAccess, checkPermission])
 
   if (loading) {

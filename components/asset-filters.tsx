@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Slider } from "@/components/ui/slider"
-import { getLocations, getProvinces } from "@/lib/firestore"
+import { getUniqueFieldValues } from "@/lib/firestore/property-service"
 import { propertyTypeLabels, marketingStatusLabels, legalPhaseLabels } from "@/types/asset"
 
 export function AssetFilters() {
@@ -49,7 +49,10 @@ export function AssetFilters() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [locationsData, provincesData] = await Promise.all([getLocations(), getProvinces()])
+        const [locationsData, provincesData] = await Promise.all([
+          getUniqueFieldValues("city"),
+          getUniqueFieldValues("province"),
+        ])
         setLocations(locationsData)
         setProvinces(provincesData)
       } catch (error) {
