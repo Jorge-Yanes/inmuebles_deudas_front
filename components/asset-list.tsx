@@ -24,11 +24,15 @@ export function AssetList() {
   // Check if any filters are applied
   const hasFilters = useCallback(() => {
     return (
-      searchParams.has("type") ||
-      searchParams.has("status") ||
-      searchParams.has("location") ||
+      searchParams.has("property_type") ||
+      searchParams.has("marketing_status") ||
+      searchParams.has("legal_phase") ||
+      searchParams.has("province") ||
+      searchParams.has("city") ||
       searchParams.has("minPrice") ||
       searchParams.has("maxPrice") ||
+      searchParams.has("minSqm") ||
+      searchParams.has("maxSqm") ||
       searchParams.has("query")
     )
   }, [searchParams])
@@ -51,27 +55,39 @@ export function AssetList() {
       }
 
       try {
-        const type = searchParams.get("type") || undefined
-        const status = searchParams.get("status") || undefined
-        const location = searchParams.get("location") || undefined
+        const property_type = searchParams.get("property_type") || undefined
+        const marketing_status = searchParams.get("marketing_status") || undefined
+        const legal_phase = searchParams.get("legal_phase") || undefined
+        const province = searchParams.get("province") || undefined
+        const city = searchParams.get("city") || undefined
         const minPrice = searchParams.get("minPrice") ? Number(searchParams.get("minPrice")) : undefined
         const maxPrice = searchParams.get("maxPrice") ? Number(searchParams.get("maxPrice")) : undefined
+        const minSqm = searchParams.get("minSqm") ? Number(searchParams.get("minSqm")) : undefined
+        const maxSqm = searchParams.get("maxSqm") ? Number(searchParams.get("maxSqm")) : undefined
         const query = searchParams.get("query") || undefined
 
         const filters = {
-          property_type: type,
-          marketing_status: status,
-          city: location,
+          property_type,
+          marketing_status,
+          legal_phase,
+          province,
+          city,
           minPrice,
           maxPrice,
+          minSqm,
+          maxSqm,
           query,
         }
+
+        console.log("Fetching assets with filters:", filters)
 
         const result = await getProperties(
           filters,
           10, // pageSize
           isInitialLoad ? undefined : lastVisibleRef.current,
         )
+
+        console.log("Fetched assets:", result.properties.length)
 
         if (isInitialLoad) {
           setAssets(result.properties)
@@ -96,6 +112,7 @@ export function AssetList() {
 
   // Initial load
   useEffect(() => {
+    console.log("Initial load triggered")
     fetchAssets(true)
     // Reset pagination when filters change
     lastVisibleRef.current = null
@@ -114,10 +131,11 @@ export function AssetList() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          console.log("Loading more assets...")
           fetchAssets(false)
         }
       },
-      { threshold: 0.5 },
+      { threshold: 0.1, rootMargin: "100px" },
     )
 
     observerRef.current = observer
@@ -135,6 +153,8 @@ export function AssetList() {
 
   const handleViewChange = (view: ViewMode) => {
     setViewMode(view)
+    // Save view preference
+    localStorage.setItem("viewMode", view)
   }
 
   if (loading) {

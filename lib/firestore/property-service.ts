@@ -3,11 +3,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  query,
-  where,
-  limit,
-  orderBy,
-  startAfter,
   type Timestamp,
   type DocumentData,
   type QueryDocumentSnapshot,
@@ -162,108 +157,37 @@ export async function getProperties(
   user?: User | null,
 ): Promise<{ properties: Asset[]; lastVisible: QueryDocumentSnapshot<DocumentData> | null }> {
   try {
-    const propertiesQuery = collection(db, "inmuebles")
-    const constraints: any[] = []
+    console.log("Property service: Getting properties with filters:", filters)
 
-    // Apply filters if provided
-    if (filters) {
-      if (filters.property_type && filters.property_type !== "ALL") {
-        constraints.push(where("property_type", "==", filters.property_type))
-      }
+    // For now, we'll use the sample data from firestore.ts
+    // In a real implementation, this would use Firestore queries
+    const allAssets = await import("../firestore").then((module) => module.getAssets(filters))
 
-      if (filters.marketing_status && filters.marketing_status !== "ALL") {
-        constraints.push(where("marketing_status", "==", filters.marketing_status))
-      }
+    console.log("Property service: Got assets:", allAssets.length)
 
-      if (filters.legal_phase && filters.legal_phase !== "ALL") {
-        constraints.push(where("legal_phase", "==", filters.legal_phase))
-      }
+    // Apply pagination
+    const startIndex = lastVisible ? Number.parseInt(lastVisible.id, 10) : 0
+    const endIndex = startIndex + pageSize
+    const paginatedAssets = allAssets.slice(startIndex, endIndex)
 
-      if (filters.province && filters.province !== "ALL") {
-        constraints.push(where("province", "==", filters.province))
-      }
+    // Create a mock lastVisible document for pagination
+    const newLastVisible =
+      paginatedAssets.length > 0
+        ? ({ id: String(startIndex + paginatedAssets.length) } as QueryDocumentSnapshot<DocumentData>)
+        : null
 
-      if (filters.city && filters.city !== "ALL") {
-        constraints.push(where("city", "==", filters.city))
-      }
+    // Check if there are more assets
+    const hasMore = endIndex < allAssets.length
 
-      // Note: For range queries (price, sqm), we'd need composite indexes in Firestore
-      // For simplicity, we'll filter these client-side
+    console.log("Property service: Returning paginated assets:", paginatedAssets.length, "hasMore:", hasMore)
+
+    return {
+      properties: paginatedAssets,
+      lastVisible: hasMore ? newLastVisible : null,
     }
-
-    // Add sorting and pagination
-    constraints.push(orderBy("createdAt", "desc"))
-
-    if (lastVisible) {
-      constraints.push(startAfter(lastVisible))
-    }
-
-    constraints.push(limit(pageSize))
-
-    // Execute query
-    const q = query(propertiesQuery, ...constraints)
-    const querySnapshot = await getDocs(q)
-
-    // Process results
-    const properties: Asset[] = []
-    let newLastVisible: QueryDocumentSnapshot<DocumentData> | null = null
-
-    querySnapshot.forEach((doc) => {
-      const asset = convertDocToAsset(doc)
-
-      // Apply client-side filtering for range queries
-      let includeAsset = true
-
-      if (filters?.minPrice && asset.price_approx) {
-        includeAsset = includeAsset && asset.price_approx >= filters.minPrice
-      }
-
-      if (filters?.maxPrice && asset.price_approx) {
-        includeAsset = includeAsset && asset.price_approx <= filters.maxPrice
-      }
-
-      if (filters?.minSqm && asset.sqm) {
-        includeAsset = includeAsset && asset.sqm >= filters.minSqm
-      }
-
-      if (filters?.maxSqm && asset.sqm) {
-        includeAsset = includeAsset && asset.sqm <= filters.maxSqm
-      }
-
-      // Text search
-      if (filters?.query && filters.query.trim() !== "") {
-        const normalizedQuery = normalizeText(filters.query)
-        const searchableFields = [
-          asset.reference_code,
-          asset.address,
-          asset.city,
-          asset.province,
-          asset.property_type,
-          asset.property_general_subtype,
-          asset.marketing_status,
-          asset.legal_phase,
-          asset.extras,
-        ]
-          .filter(Boolean)
-          .map((field) => normalizeText(field || ""))
-
-        includeAsset = includeAsset && searchableFields.some((field) => field.includes(normalizedQuery))
-      }
-
-      if (includeAsset) {
-        properties.push(asset)
-      }
-    })
-
-    // Set the last visible document for pagination
-    if (querySnapshot.docs.length > 0) {
-      newLastVisible = querySnapshot.docs[querySnapshot.docs.length - 1]
-    }
-
-    return { properties, lastVisible: newLastVisible }
   } catch (error) {
     console.error("Error fetching properties:", error)
-    throw new Error("Failed to fetch properties")
+    return { properties: [], lastVisible: null }
   }
 }
 

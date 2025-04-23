@@ -359,6 +359,8 @@ export async function getAssets(filters?: AssetFilter) {
   // Simular retraso de API
   await new Promise((resolve) => setTimeout(resolve, 800))
 
+  console.log("Getting assets with filters:", filters)
+
   let filteredAssets = [...sampleAssets]
 
   if (filters) {
@@ -406,6 +408,8 @@ export async function getAssets(filters?: AssetFilter) {
       })
     }
   }
+
+  console.log("Filtered assets count:", filteredAssets.length)
 
   // Añadir títulos y descripciones generadas para la UI
   return filteredAssets.map((asset) => ({
