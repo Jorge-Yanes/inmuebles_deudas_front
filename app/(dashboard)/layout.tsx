@@ -8,7 +8,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Header />
       <div className="flex flex-1">
         <ClientSidebar /> {/* Add the sidebar component */}
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 relative overflow-auto">{children}</main>
       </div>
     </div>
   )

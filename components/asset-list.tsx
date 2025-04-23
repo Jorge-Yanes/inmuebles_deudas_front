@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 
-import { getAssets } from "@/lib/firestore"
+import { getProperties } from "@/lib/firestore/property-service"
 import type { Asset } from "@/types/asset"
 import { ViewToggle, type ViewMode } from "@/components/view-toggle"
 import { AssetGridItem } from "@/components/asset-grid-item"
@@ -26,8 +26,17 @@ export function AssetList() {
         const maxPrice = searchParams.get("maxPrice") ? Number(searchParams.get("maxPrice")) : undefined
         const query = searchParams.get("query") || undefined
 
-        const data = await getAssets({ type, status, location, minPrice, maxPrice, query })
-        setAssets(data)
+        const filters = {
+          property_type: type,
+          marketing_status: status,
+          city: location,
+          minPrice,
+          maxPrice,
+          query,
+        }
+
+        const result = await getProperties(filters)
+        setAssets(result.properties)
       } catch (error) {
         console.error("Error fetching assets:", error)
       } finally {
