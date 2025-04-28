@@ -84,9 +84,13 @@ export function AssetDetails({ id }: AssetDetailsProps) {
                 </p>
               </div>
             )}
-            <div className="w-full h-full flex items-center justify-center bg-muted">
-              <p className="text-muted-foreground text-center p-4">No tiene permisos para ver el mapa catastral</p>
-            </div>
+            {/* This is the fallback content when user doesn't have permission */}
+            <iframe
+              src={`https://www.openstreetmap.org/export/embed.html?bbox=-10%2C35%2C5%2C45&layer=mapnik&marker=${encodeURIComponent(`${asset.city}, ${asset.province}, ${asset.zip_code || ""} Spain`)}`}
+              className="w-full h-full border-0"
+              title={`Mapa de la zona de ${asset.city}, ${asset.province}`}
+              loading="lazy"
+            />
           </ConditionalField>
         </div>
 

@@ -37,9 +37,13 @@ export function AssetListItem({ asset }: AssetListItemProps) {
                 </p>
               </div>
             )}
-            <div className="w-full h-full flex items-center justify-center bg-muted">
-              <p className="text-muted-foreground text-center p-4">No tiene permisos para ver el mapa catastral</p>
-            </div>
+            {/* Fallback map for users without permission - shows postal code area */}
+            <iframe
+              src={`https://www.openstreetmap.org/export/embed.html?bbox=-9.3,35.9,3.3,43.8&layer=mapnik&marker=${asset.city},${asset.province},España${asset.zip_code ? ` ${asset.zip_code}` : ""}`}
+              className="w-full h-full border-0"
+              title={`Mapa de ubicación de ${asset.title || `${propertyType} en ${asset.city}`}`}
+              loading="lazy"
+            />
           </ConditionalField>
 
           <Badge
