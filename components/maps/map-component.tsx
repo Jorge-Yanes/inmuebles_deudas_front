@@ -1,113 +1,64 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { MapContainer, TileLayer, GeoJSON, useMap } from "react-leaflet"
+import { useEffect } from "react"
+import { MapContainer, TileLayer, GeoJSON, Marker, Popup } from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 
 // Fix Leaflet icon issues
 function fixLeafletIcons() {
-  // Only run on the client
-  if (typeof window !== "undefined") {
-    // This is needed to fix the marker icon issues with webpack
-    delete (L.Icon.Default.prototype as any)._getIconUrl
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl: "/images/marker-icon-2x.png",
-      iconUrl: "/images/marker-icon.png",
-      shadowUrl: "/images/marker-shadow.png",
-    })
-  }
+  // Fix the default icon paths that are broken in production build
+  delete (L.Icon.Default.prototype as any)._getIconUrl
+
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: "/images/marker-icon-2x.png",
+    iconUrl: "/images/marker-icon.png",
+    shadowUrl: "/images/marker-shadow.png",
+  })
 }
 
-function FitBounds({ geoData }: { geoData: any }) {
-  const map = useMap()
-
-  useEffect(() => {
-    if (geoData) {
-      const layer = L.geoJSON(geoData)
-      map.fitBounds(layer.getBounds())
-    }
-  }, [geoData, map])
-
-  return null
+interface MapComponentProps {
+  geoData: any
+  postalCode: string
 }
 
-export function MapComponent({ postalCode }: { postalCode: string }) {
-  const [geoData, setGeoData] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-
-  // Fix Leaflet icons on component mount
+export function MapComponent({ geoData, postalCode }: MapComponentProps) {
   useEffect(() => {
     fixLeafletIcons()
   }, [])
 
-  useEffect(() => {
-    async function fetchData() {
-      if (!postalCode) {
-        setLoading(false)
-        return
-      }
-
-      setLoading(true)
-      setError(false)
-
-      try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?postalcode=${postalCode}&country=Spain&format=geojson&polygon_geojson=1`,
-        )
-        const data = await res.json()
-        if (data.features && data.features.length > 0) {
-          setGeoData(data.features[0].geometry)
-        } else {
-          setError(true)
-        }
-      } catch (err) {
-        console.error("Error fetching postal code data:", err)
-        setError(true)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [postalCode])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full w-full min-h-[300px] bg-muted">
-        <p className="text-muted-foreground">Cargando mapa...</p>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-full w-full min-h-[300px] bg-muted">
-        <p className="text-muted-foreground">No se pudo cargar el mapa para este código postal</p>
-      </div>
-    )
-  }
+  // Default center for Spain if no specific data
+  const defaultCenter: [number, number] = [40.4168, -3.7038] // Madrid coordinates
+  const defaultZoom = 6
 
   return (
-    <div className="h-[300px] w-full">
-      <MapContainer
-        center={[40.4168, -3.7038]}
-        zoom={6}
-        style={{ height: "100%", width: "100%" }}
-        scrollWheelZoom={false}
-      >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        />
-        {geoData && (
-          <>
-            <GeoJSON data={geoData} />
-            <FitBounds geoData={geoData} />
-          </>
-        )}
-      </MapContainer>
-    </div>
+    <MapContainer
+      center={defaultCenter}
+      zoom={defaultZoom}
+      style={{ height: "100%", width: "100%", minHeight: "200px" }}
+      scrollWheelZoom={false}
+    >
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+
+      {geoData && geoData.features && geoData.features.length > 0 && (
+        <>
+          <GeoJSON
+            data={geoData}
+            style={() => ({
+              color: "#3b82f6",
+              weight: 2,
+              fillOpacity: 0.2,
+              fillColor: "#93c5fd",
+            })}
+          />
+          <Marker position={[geoData.features[0].geometry.coordinates[1], geoData.features[0].geometry.coordinates[0]]}>
+            <Popup>Código postal: {postalCode}</Popup>
+          </Marker>
+        </>
+      )}
+    </MapContainer>
   )
 }
