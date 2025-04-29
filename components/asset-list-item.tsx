@@ -2,15 +2,25 @@
 
 import Link from "next/link"
 import { ArrowUpRight, Building, Calendar, Home, MapPin, Ruler } from "lucide-react"
+import dynamic from "next/dynamic"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ConditionalField } from "@/components/permissions/conditional-field"
 import { RestrictedValue } from "@/components/permissions/restricted-value"
-import { StaticMap } from "@/components/maps/static-map"
 import type { Asset } from "@/types/asset"
 import { formatCurrency, marketingStatusLabels, propertyTypeLabels } from "@/types/asset"
+
+// Dynamically import the map component with no SSR
+const PostalCodeMap = dynamic(() => import("./maps/postal-code-map"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-full w-full bg-muted">
+      <p className="text-muted-foreground">Cargando mapa...</p>
+    </div>
+  ),
+})
 
 interface AssetListItemProps {
   asset: Asset
@@ -25,7 +35,25 @@ export function AssetListItem({ asset }: AssetListItemProps) {
     <Card className="overflow-hidden">
       <div className="flex flex-col md:flex-row">
         <div className="relative h-48 md:h-auto md:w-1/3 md:max-w-xs">
-          <StaticMap postalCode={asset.zip_code} city={asset.city} province={asset.province} />
+          {/* Map area */}
+          <ConditionalField fieldName="zip_code">
+            {asset.zip_code ? (
+              <RestrictedValue
+                fieldName="zip_code"
+                value={<PostalCodeMap postalCode={asset.zip_code} />}
+                fallback={
+                  <div className="flex items-center justify-center h-full w-full bg-muted">
+                    <p className="text-muted-foreground">Mapa restringido</p>
+                  </div>
+                }
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full w-full bg-muted">
+                <p className="text-muted-foreground">No hay código postal disponible</p>
+              </div>
+            )}
+          </ConditionalField>
+
           <Badge
             className="absolute right-2 top-2"
             variant={marketingStatus === "Disponible" ? "default" : "secondary"}

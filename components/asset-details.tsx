@@ -9,9 +9,20 @@ import { useAuth } from "@/context/auth-context"
 import { useFieldPermissions } from "@/context/field-permissions-context"
 import { ConditionalField } from "@/components/permissions/conditional-field"
 import { RestrictedValue } from "@/components/permissions/restricted-value"
-import { StaticMap } from "@/components/maps/static-map"
 import type { Asset } from "@/types/asset"
 import { formatCurrency, formatDate, marketingStatusLabels, propertyTypeLabels, legalPhaseLabels } from "@/types/asset"
+import AssetMap from "./maps/asset-map"
+import dynamic from "next/dynamic"
+
+// Dynamically import the map component with no SSR
+const PostalCodeMap = dynamic(() => import("./maps/postal-code-map"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-[300px] w-full bg-muted">
+      <p className="text-muted-foreground">Cargando mapa...</p>
+    </div>
+  ),
+})
 
 interface AssetDetailsProps {
   id: string
@@ -70,7 +81,7 @@ export function AssetDetails({ id }: AssetDetailsProps) {
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2">
         <div className="relative aspect-video overflow-hidden rounded-lg">
-          <StaticMap postalCode={asset.zip_code} city={asset.city} province={asset.province} height={400} width={800} />
+          <AssetMap asset={asset} />
         </div>
 
         <div className="mt-6">
