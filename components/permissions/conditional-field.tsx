@@ -1,23 +1,21 @@
 "use client"
 
-import type React from "react"
+import type { ReactNode } from "react"
 import { useFieldPermissions } from "@/context/field-permissions-context"
 
 interface ConditionalFieldProps {
   fieldName: string
-  children: React.ReactNode
-  fallback?: React.ReactNode
-  requireEdit?: boolean
+  children: ReactNode
+  fallback?: ReactNode
 }
 
-export function ConditionalField({ fieldName, children, fallback = null, requireEdit = false }: ConditionalFieldProps) {
-  const { hasViewPermission, hasEditPermission } = useFieldPermissions()
+export function ConditionalField({ fieldName, children, fallback }: ConditionalFieldProps) {
+  const { hasViewPermission } = useFieldPermissions()
+  const hasPermission = hasViewPermission(fieldName)
 
-  const hasPermission = requireEdit ? hasEditPermission(fieldName) : hasViewPermission(fieldName)
-
-  if (!hasPermission) {
-    return <>{fallback}</>
+  if (hasPermission) {
+    return <>{children}</>
   }
 
-  return <>{children}</>
+  return <>{fallback || null}</>
 }

@@ -48,3 +48,13 @@ export function generateDescription(asset: Asset): string {
 
   return description
 }
+
+// Función para formatear valores monetarios en euros
+export function formatCurrency(value?: number): string {
+  if (value === undefined || value === null) return "N/A"
+  return new Intl.NumberFormat("es-ES", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  }).format(value)
+}

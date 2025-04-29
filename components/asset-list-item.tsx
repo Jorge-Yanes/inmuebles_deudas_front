@@ -1,128 +1,88 @@
-import Link from "next/link"
-import { ArrowUpRight, Building, Calendar, Home, MapPin, Ruler } from "lucide-react"
+"use client"
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { ConditionalField } from "@/components/permissions/conditional-field"
-import { RestrictedValue } from "@/components/permissions/restricted-value"
 import type { Asset } from "@/types/asset"
-import { formatCurrency, marketingStatusLabels, propertyTypeLabels } from "@/types/asset"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { formatCurrency } from "@/lib/utils"
+import Link from "next/link"
+import { ConditionalField } from "./permissions/conditional-field"
+import { RestrictedValue } from "./permissions/restricted-value"
+import dynamic from "next/dynamic"
 
-interface AssetListItemProps {
-  asset: Asset
-}
+// Dynamically import the map component with no SSR
+const PostalCodeMap = dynamic(() => import("./maps/postal-code-map"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-[150px] w-full bg-muted">
+      <p className="text-muted-foreground">Cargando mapa...</p>
+    </div>
+  ),
+})
 
-export function AssetListItem({ asset }: AssetListItemProps) {
-  const propertyType = propertyTypeLabels[asset.property_type] || asset.property_type
-  const marketingStatus =
-    marketingStatusLabels[asset.marketing_status || "AVAILABLE"] || asset.marketing_status || "Disponible"
-
+export function AssetListItem({ asset }: { asset: Asset }) {
   return (
     <Card className="overflow-hidden">
-      <div className="flex flex-col md:flex-row">
-        <div className="relative h-48 md:h-auto md:w-1/3 md:max-w-xs">
-          <ConditionalField fieldName="cadastral_reference">
-            {asset.cadastral_reference ? (
-              <iframe
-                src={`https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?refcat=${asset.cadastral_reference}`}
-                className="w-full h-full border-0"
-                title={`Mapa catastral de ${asset.title || `${propertyType} en ${asset.city}`}`}
-                loading="lazy"
+      <CardContent className="p-0">
+        <div className="grid md:grid-cols-[250px_1fr_250px] gap-4">
+          <div className="relative h-48 bg-muted">
+            {asset.images && asset.images.length > 0 ? (
+              <img
+                src={asset.images[0] || "/placeholder.svg"}
+                alt={asset.title}
+                className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-muted">
-                <p className="text-muted-foreground text-center p-4">
-                  No hay referencia catastral disponible para este inmueble
-                </p>
+              <div className="flex items-center justify-center h-full w-full">
+                <p className="text-muted-foreground">Sin imagen</p>
               </div>
             )}
-            {/* Fallback map for users without permission - shows postal code area */}
-            <iframe
-              src={`https://www.openstreetmap.org/export/embed.html?bbox=-9.3,35.9,3.3,43.8&layer=mapnik&marker=${asset.city},${asset.province},España${asset.zip_code ? ` ${asset.zip_code}` : ""}`}
-              className="w-full h-full border-0"
-              title={`Mapa de ubicación de ${asset.title || `${propertyType} en ${asset.city}`}`}
-              loading="lazy"
-            />
-          </ConditionalField>
+            <div className="absolute top-2 right-2">
+              <Badge variant="secondary">{asset.type}</Badge>
+            </div>
+          </div>
 
-          <Badge
-            className="absolute right-2 top-2"
-            variant={marketingStatus === "Disponible" ? "default" : "secondary"}
-          >
-            {marketingStatus}
-          </Badge>
-        </div>
-
-        <div className="flex flex-col flex-grow p-4">
-          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-2">
-            <div>
-              <h3 className="text-xl font-semibold">{asset.title || `${propertyType} en ${asset.city}`}</h3>
-              <div className="mt-1 flex items-center text-sm text-muted-foreground">
-                <MapPin className="mr-1 h-4 w-4" />
-                {asset.address}, {asset.city}, {asset.province}
-              </div>
-              <ConditionalField fieldName="reference_code">
-                {asset.reference_code && (
-                  <div className="mt-1 text-xs text-muted-foreground">Ref: {asset.reference_code}</div>
-                )}
+          <div className="p-4">
+            <Link href={`/assets/${asset.id}`}>
+              <h3 className="font-semibold text-lg mb-2 hover:text-primary transition-colors">{asset.title}</h3>
+            </Link>
+            <div className="space-y-2">
+              <ConditionalField fieldName="location">
+                <p className="text-sm text-muted-foreground">
+                  <RestrictedValue
+                    fieldName="location"
+                    value={`${asset.location.city}, ${asset.location.postalCode}`}
+                    fallback="Ubicación restringida"
+                  />
+                </p>
               </ConditionalField>
+              <ConditionalField fieldName="price">
+                <p className="font-bold text-lg">
+                  <RestrictedValue
+                    fieldName="price"
+                    value={formatCurrency(asset.price)}
+                    fallback="Precio restringido"
+                  />
+                </p>
+              </ConditionalField>
+              <p className="text-sm">{asset.description.substring(0, 150)}...</p>
             </div>
-            <RestrictedValue
-              fieldName="price_approx"
-              value={<p className="text-xl font-bold md:text-right">{formatCurrency(asset.price_approx)}</p>}
-            />
           </div>
 
-          <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
-            {asset.description ||
-              `${propertyType} ubicado en ${asset.address}, ${asset.city}, ${asset.province}. ${asset.sqm}m².`}
-          </p>
-
-          <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="flex items-center gap-2">
-              <Ruler className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Superficie</p>
-                <p className="text-sm font-medium">{asset.sqm} m²</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {asset.property_type === "RESIDENTIAL" ? (
-                <Home className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <Building className="h-4 w-4 text-muted-foreground" />
-              )}
-              <div>
-                <p className="text-xs text-muted-foreground">Tipo</p>
-                <p className="text-sm font-medium">{propertyType}</p>
-              </div>
-            </div>
-            <ConditionalField fieldName="year">
-              {asset.year && (
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Año</p>
-                    <p className="text-sm font-medium">{asset.year || "N/A"}</p>
+          <ConditionalField fieldName="location.postalCode">
+            <div className="h-full">
+              <RestrictedValue
+                fieldName="location.postalCode"
+                value={<PostalCodeMap postalCode={asset.location.postalCode} />}
+                fallback={
+                  <div className="flex items-center justify-center h-full w-full bg-muted">
+                    <p className="text-muted-foreground">Mapa restringido</p>
                   </div>
-                </div>
-              )}
-            </ConditionalField>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">{marketingStatus}</Badge>
+                }
+              />
             </div>
-          </div>
-
-          <div className="mt-4 flex justify-end">
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/assets/${asset.id}`}>
-                Ver Detalles <ArrowUpRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
+          </ConditionalField>
         </div>
-      </div>
+      </CardContent>
     </Card>
   )
 }

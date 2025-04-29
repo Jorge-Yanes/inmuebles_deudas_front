@@ -11,6 +11,18 @@ import { ConditionalField } from "@/components/permissions/conditional-field"
 import { RestrictedValue } from "@/components/permissions/restricted-value"
 import type { Asset } from "@/types/asset"
 import { formatCurrency, formatDate, marketingStatusLabels, propertyTypeLabels, legalPhaseLabels } from "@/types/asset"
+import AssetMap from "./maps/asset-map"
+import dynamic from "next/dynamic"
+
+// Dynamically import the map component with no SSR
+const PostalCodeMap = dynamic(() => import("./maps/postal-code-map"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-[300px] w-full bg-muted">
+      <p className="text-muted-foreground">Cargando mapa...</p>
+    </div>
+  ),
+})
 
 interface AssetDetailsProps {
   id: string
@@ -69,29 +81,7 @@ export function AssetDetails({ id }: AssetDetailsProps) {
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2">
         <div className="relative aspect-video overflow-hidden rounded-lg">
-          <ConditionalField fieldName="cadastral_reference">
-            {asset.cadastral_reference ? (
-              <iframe
-                src={`https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?refcat=${asset.cadastral_reference}`}
-                className="w-full h-full border-0"
-                title={`Mapa catastral de ${asset.title || `${propertyType} en ${asset.city}`}`}
-                loading="lazy"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-muted">
-                <p className="text-muted-foreground text-center p-4">
-                  No hay referencia catastral disponible para este inmueble
-                </p>
-              </div>
-            )}
-            {/* This is the fallback content when user doesn't have permission */}
-            <iframe
-              src={`https://www.openstreetmap.org/export/embed.html?bbox=-10%2C35%2C5%2C45&layer=mapnik&marker=${encodeURIComponent(`${asset.city}, ${asset.province}, ${asset.zip_code || ""} Spain`)}`}
-              className="w-full h-full border-0"
-              title={`Mapa de la zona de ${asset.city}, ${asset.province}`}
-              loading="lazy"
-            />
-          </ConditionalField>
+          <AssetMap asset={asset} />
         </div>
 
         <div className="mt-6">

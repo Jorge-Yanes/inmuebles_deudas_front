@@ -60,8 +60,10 @@
     "zod": "^3.24.1",
     "@auth/core": "latest",
     "nodemailer": "latest",
+    "leaflet": "latest",
     "firebase": "latest",
-    "next-auth": "latest"
+    "next-auth": "latest",
+    "react-leaflet": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
