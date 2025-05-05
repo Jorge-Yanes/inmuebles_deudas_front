@@ -10,6 +10,17 @@ import { ConditionalField } from "@/components/permissions/conditional-field"
 import { RestrictedValue } from "@/components/permissions/restricted-value"
 import type { Asset } from "@/types/asset"
 import { formatCurrency, marketingStatusLabels, propertyTypeLabels } from "@/types/asset"
+import { useAuth } from "@/context/auth-context"
+
+// Dynamically import the cadastral map component with no SSR
+const CadastralMap = dynamic(() => import("./maps/cadastral-map"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-[150px] w-full bg-muted">
+      <p className="text-muted-foreground">Cargando mapa catastral...</p>
+    </div>
+  ),
+})
 
 // Dynamically import the map component with no SSR
 const PostalCodeMap = dynamic(() => import("./maps/postal-code-map"), {
@@ -26,6 +37,8 @@ interface AssetGridItemProps {
 }
 
 export function AssetGridItem({ asset }: AssetGridItemProps) {
+  const { user } = useAuth()
+  const isAdmin = user?.role === "admin"
   const propertyType = propertyTypeLabels[asset.property_type] || asset.property_type
   const marketingStatus =
     marketingStatusLabels[asset.marketing_status || "AVAILABLE"] || asset.marketing_status || "Disponible"
@@ -36,7 +49,22 @@ export function AssetGridItem({ asset }: AssetGridItemProps) {
         <div className="relative h-40">
           {/* Map area */}
           <ConditionalField fieldName="zip_code">
-            {asset.zip_code ? (
+            {isAdmin ? (
+              // Show cadastral map for admins
+              <CadastralMap
+                reference={asset.cadastral_reference || asset.reference_code}
+                fallback={
+                  asset.zip_code ? (
+                    <PostalCodeMap postalCode={asset.zip_code} />
+                  ) : (
+                    <div className="flex items-center justify-center h-full w-full bg-muted">
+                      <p className="text-muted-foreground">No hay referencia catastral disponible</p>
+                    </div>
+                  )
+                }
+              />
+            ) : // Show postal code map for non-admins
+            asset.zip_code ? (
               <RestrictedValue
                 fieldName="zip_code"
                 value={<PostalCodeMap postalCode={asset.zip_code} />}

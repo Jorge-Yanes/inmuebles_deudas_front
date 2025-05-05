@@ -136,7 +136,7 @@ export function SearchBar({
 
       {/* Suggestions dropdown */}
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute mt-1 w-full rounded-md border bg-background shadow-lg">
+        <div className="absolute mt-1 w-full rounded-md border bg-background shadow-lg z-50">
           <ul className="py-1">
             {suggestions.map((suggestion, index) => (
               <li
