@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AssetDetails } from "@/components/asset-details"
 import { AssetAccessGuard } from "@/components/asset-access-guard"
-import { getPropertyById } from "@/lib/firestore/property-service"
 
 interface AssetPageProps {
   params: {
@@ -14,9 +13,7 @@ interface AssetPageProps {
   }
 }
 
-export default async function AssetPage({ params }: AssetPageProps) {
-  // Pre-fetch the asset to get its type, province, and portfolio
-  const asset = await getPropertyById(params.id)
+export default function AssetPage({ params }: AssetPageProps) {
 
   return (
     <div className="flex flex-col gap-8 p-4 md:p-8">
@@ -33,12 +30,7 @@ export default async function AssetPage({ params }: AssetPageProps) {
       </div>
 
       <Suspense fallback={<Skeleton className="h-[500px] w-full" />}>
-        <AssetAccessGuard
-          assetId={params.id}
-          assetType={asset?.property_type}
-          province={asset?.province}
-          portfolio={asset?.portfolio}
-        >
+        <AssetAccessGuard assetId={params.id}>
           <AssetDetails id={params.id} />
         </AssetAccessGuard>
       </Suspense>
