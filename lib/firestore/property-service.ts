@@ -127,7 +127,7 @@ export async function getPropertyById(id: string, user?: User | null): Promise<A
       }
     }
 
-    const propertyDoc = await getDoc(doc(db, "inmuebles", id))
+    const propertyDoc = await getDoc(doc(db, "inmueblesMayo", id))
 
     if (!propertyDoc.exists()) {
       return null
@@ -194,7 +194,7 @@ export async function getProperties(
 // Get unique values for filters
 export async function getUniqueFieldValues(field: string): Promise<string[]> {
   try {
-    const querySnapshot = await getDocs(collection(db, "inmuebles"))
+    const querySnapshot = await getDocs(collection(db, "inmueblesMayo"))
     const uniqueValues = new Set<string>()
 
     querySnapshot.forEach((doc) => {
@@ -219,7 +219,7 @@ export async function getPropertyStats(userId?: string): Promise<{
   averageValue: number
 }> {
   try {
-    const querySnapshot = await getDocs(collection(db, "inmuebles"))
+    const querySnapshot = await getDocs(collection(db, "inmueblesMayo"))
 
     let totalProperties = 0
     let totalValue = 0
@@ -265,7 +265,7 @@ export async function searchProperties(query: string): Promise<Asset[]> {
     }
 
     const normalizedQuery = normalizeText(query)
-    const querySnapshot = await getDocs(collection(db, "inmuebles"))
+    const querySnapshot = await getDocs(collection(db, "inmueblesMayo"))
     const results: Asset[] = []
 
     querySnapshot.forEach((doc) => {
