@@ -73,15 +73,8 @@ export function SearchBar({
 
   const handleSearch = (searchQuery: string) => {
     if (searchQuery.trim()) {
-      if (onSearch) {
-        onSearch(searchQuery)
-      } else if (pathname === "/search") {
-        // Update search page URL with query
-        router.push(`/search?q=${encodeURIComponent(searchQuery)}`)
-      } else {
-        // Navigate to search page with query
-        router.push(`/search?q=${encodeURIComponent(searchQuery)}`)
-      }
+      // Always redirect to the search page with the query
+      router.push(`/search?q=${encodeURIComponent(searchQuery)}`)
     }
     setShowSuggestions(false)
   }

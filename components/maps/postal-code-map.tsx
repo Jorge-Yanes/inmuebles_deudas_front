@@ -1,74 +1,102 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import dynamic from "next/dynamic"
+import { useState, useEffect } from "react"
+import { useAuth } from "@/context/auth-context"
+import { MapTypeSelector, type MapType } from "./map-type-selector"
 
-// Loading component for the map
-function MapLoading() {
-  return (
-    <div className="flex items-center justify-center h-full w-full bg-muted">
-      <p className="text-muted-foreground">Cargando mapa...</p>
-    </div>
-  )
+interface PostalCodeMapProps {
+  postalCode: string
+  cadastralReference?: string
+  height?: string | number
 }
 
-// Dynamically import the map component with no SSR
-const MapWithNoSSR = dynamic(() => import("./map-component").then((mod) => mod.MapComponent), {
-  ssr: false,
-  loading: () => <MapLoading />,
-})
+export default function PostalCodeMap({ postalCode, cadastralReference, height = "100%" }: PostalCodeMapProps) {
+  const { user } = useAuth()
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [mapUrl, setMapUrl] = useState("")
+  const [mapType, setMapType] = useState<MapType>("standard")
 
-export default function PostalCodeMap({ postalCode }: { postalCode: string }) {
-  const [geoData, setGeoData] = useState<any>(null)
-  const [error, setError] = useState<boolean>(false)
-  const [loading, setLoading] = useState<boolean>(true)
+  const mapStyle = typeof height === "number" ? { height: `${height}px` } : { height }
+  const hasCadastralData = !!cadastralReference
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true)
-        setError(false)
-
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?postalcode=${postalCode}&country=Spain&format=geojson&polygon_geojson=1`,
-        )
-
-        if (!res.ok) {
-          throw new Error(`Error fetching map data: ${res.status}`)
-        }
-
-        const data = await res.json()
-
-        if (data.features && data.features.length > 0) {
-          setGeoData(data)
-        } else {
-          // If no specific postal code data, use a default location for Spain
-          setGeoData(null)
-        }
-      } catch (err) {
-        console.error("Error loading map data:", err)
-        setError(true)
-      } finally {
-        setLoading(false)
-      }
+    if (!postalCode) {
+      setError(true)
+      setLoading(false)
+      return
     }
 
-    if (postalCode) {
-      fetchData()
-    }
+    setLoading(true)
+    setError(false)
+
+    // For OpenStreetMap, we'll use a direct iframe to their map
+    // We'll encode the postal code for Spain
+    const encodedQuery = encodeURIComponent(`${postalCode}, Spain`)
+    const url = `https://www.openstreetmap.org/export/embed.html?bbox=-10.0,35.0,5.0,44.0&layer=mapnik&marker=40.416775,-3.70379&query=${encodedQuery}`
+
+    setMapUrl(url)
+
+    // Simulate loading delay
+    const timer = setTimeout(() => {
+      setLoading(false)
+    }, 500)
+
+    return () => clearTimeout(timer)
   }, [postalCode])
 
-  if (error) {
+  if (error || !postalCode) {
     return (
-      <div className="flex items-center justify-center h-full w-full bg-muted">
-        <p className="text-muted-foreground">Error al cargar el mapa</p>
+      <div className="flex items-center justify-center h-full w-full bg-muted" style={mapStyle}>
+        <p className="text-muted-foreground">No hay código postal disponible</p>
       </div>
     )
   }
 
   if (loading) {
-    return <MapLoading />
+    return (
+      <div className="flex items-center justify-center h-full w-full bg-muted" style={mapStyle}>
+        <p className="text-muted-foreground">Cargando mapa...</p>
+      </div>
+    )
   }
 
-  return <MapWithNoSSR geoData={geoData} postalCode={postalCode} />
+  // Determine which map to show based on user role and selected map type
+  const showCadastralMap = user?.role === "admin" && mapType === "cadastral" && hasCadastralData
+
+  return (
+    <div className="relative w-full overflow-hidden rounded-md" style={mapStyle}>
+      <MapTypeSelector onChange={setMapType} currentType={mapType} hasCadastralData={hasCadastralData} />
+
+      {showCadastralMap ? (
+        <iframe
+          src={`https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?refcat=${cadastralReference}`}
+          width="100%"
+          height="100%"
+          frameBorder="0"
+          style={{ border: 0 }}
+          allowFullScreen
+          aria-hidden="false"
+          tabIndex={0}
+          title={`Mapa catastral`}
+          loading="lazy"
+          onError={() => setError(true)}
+        />
+      ) : (
+        <iframe
+          src={mapUrl}
+          width="100%"
+          height="100%"
+          frameBorder="0"
+          style={{ border: 0 }}
+          allowFullScreen
+          aria-hidden="false"
+          tabIndex={0}
+          title={`Mapa de ${postalCode}`}
+          loading="lazy"
+          onError={() => setError(true)}
+        />
+      )}
+    </div>
+  )
 }

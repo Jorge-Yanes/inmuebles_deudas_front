@@ -1,104 +1,158 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { SearchBar } from "@/components/search-bar"
-import { searchProperties } from "@/lib/firestore/property-service"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
+import { List, MapPin } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { searchProperties, getFilteredProperties } from "@/lib/firestore/property-service"
 import type { Asset } from "@/types/asset"
-import { ViewToggle, type ViewMode } from "@/components/view-toggle"
 import { AssetGridItem } from "@/components/asset-grid-item"
-import { AssetListItem } from "@/components/asset-list-item"
+import AssetMap from "@/components/maps/asset-map"
 
 interface SearchResultsProps {
   query: string
+  view?: string
+  searchParams?: Record<string, string | undefined>
 }
 
-export function SearchResults({ query }: SearchResultsProps) {
+export function SearchResults({ query, view = "list", searchParams = {} }: SearchResultsProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const urlSearchParams = useSearchParams()
   const [assets, setAssets] = useState<Asset[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState(query)
-  const [viewMode, setViewMode] = useState<ViewMode>("list")
+  const [activeView, setActiveView] = useState<"list" | "map">(view === "map" ? "map" : "list")
+  const [sortOption, setSortOption] = useState<"relevance" | "price">("relevance")
 
   useEffect(() => {
     const fetchResults = async () => {
       setLoading(true)
       try {
-        if (!searchQuery.trim()) {
-          setAssets([])
-          setLoading(false)
-          return
+        let results: Asset[] = []
+
+        if (query.trim()) {
+          // If there's a search query, use search
+          results = await searchProperties(query)
+        } else {
+          // Otherwise use filters
+          results = await getFilteredProperties(searchParams)
         }
 
-        const results = await searchProperties(searchQuery)
+        // Sort results
+        if (sortOption === "price") {
+          results.sort((a, b) => (a.price_approx || 0) - (b.price_approx || 0))
+        }
+
         setAssets(results)
       } catch (error) {
-        console.error("Error searching assets:", error)
+        console.error("Error fetching assets:", error)
       } finally {
         setLoading(false)
       }
     }
 
     fetchResults()
-  }, [searchQuery])
+  }, [query, searchParams, sortOption])
 
-  const handleSearch = (newQuery: string) => {
-    setSearchQuery(newQuery)
+  const handleViewChange = (view: "list" | "map") => {
+    setActiveView(view)
+
+    // Update URL to persist view preference
+    const params = new URLSearchParams(urlSearchParams)
+    params.set("view", view)
+    router.push(`${pathname}?${params.toString()}`)
   }
 
-  const handleViewChange = (view: ViewMode) => {
-    setViewMode(view)
+  const handleSortChange = (sort: "relevance" | "price") => {
+    setSortOption(sort)
   }
 
   if (loading) {
-    return <div className="text-center">Buscando activos inmobiliarios...</div>
-  }
-
-  if (!searchQuery.trim()) {
     return (
-      <div className="flex flex-col items-center gap-6">
+      <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <p className="text-lg">Ingrese un término de búsqueda para encontrar activos inmobiliarios</p>
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Buscando activos inmobiliarios...</p>
         </div>
-        <SearchBar initialQuery={searchQuery} onSearch={handleSearch} className="max-w-xl" />
       </div>
     )
   }
 
   if (assets.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-6">
-        <div className="text-center">
-          <p className="text-lg">No se encontraron resultados para "{searchQuery}"</p>
-          <p className="mt-2 text-muted-foreground">Intente con otros términos de búsqueda</p>
-        </div>
-        <SearchBar initialQuery={searchQuery} onSearch={handleSearch} className="max-w-xl" />
+      <div className="flex flex-col items-center justify-center h-64 text-center">
+        <MapPin className="h-12 w-12 text-muted-foreground mb-4" />
+        <h3 className="text-xl font-semibold mb-2">No se encontraron resultados</h3>
+        <p className="text-muted-foreground max-w-md">
+          No hay activos inmobiliarios que coincidan con tu búsqueda. Intenta con otros criterios o amplía los filtros.
+        </p>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <SearchBar initialQuery={searchQuery} onSearch={handleSearch} className="max-w-xl" />
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <p className="text-muted-foreground">
+            {assets.length} {assets.length === 1 ? "propiedad encontrada" : "propiedades encontradas"}
+          </p>
+        </div>
 
-      <div className="flex items-center justify-between">
-        <p className="text-muted-foreground">
-          Se encontraron {assets.length} resultado{assets.length !== 1 ? "s" : ""}
-        </p>
-        <ViewToggle onChange={handleViewChange} defaultView="list" />
+        <div className="flex items-center gap-4">
+          {/* Sort options */}
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Ordenar por:</span>
+            <Button
+              variant="link"
+              size="sm"
+              className={sortOption === "relevance" ? "text-primary font-medium underline" : ""}
+              onClick={() => handleSortChange("relevance")}
+            >
+              Relevancia
+            </Button>
+            <Button
+              variant="link"
+              size="sm"
+              className={sortOption === "price" ? "text-primary font-medium underline" : ""}
+              onClick={() => handleSortChange("price")}
+            >
+              Baratos
+            </Button>
+          </div>
+
+          {/* View toggle */}
+          <Tabs value={activeView} onValueChange={(v) => handleViewChange(v as "list" | "map")} className="w-auto">
+            <TabsList className="grid w-[160px] grid-cols-2">
+              <TabsTrigger value="list" className="flex items-center gap-1">
+                <List className="h-4 w-4" />
+                <span>Lista</span>
+              </TabsTrigger>
+              <TabsTrigger value="map" className="flex items-center gap-1">
+                <MapPin className="h-4 w-4" />
+                <span>Mapa</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
 
-      {viewMode === "grid" ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {assets.map((asset) => (
-            <AssetGridItem key={asset.id} asset={asset} />
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {assets.map((asset) => (
-            <AssetListItem key={asset.id} asset={asset} />
-          ))}
-        </div>
-      )}
+      <Tabs value={activeView} className="w-full">
+        <TabsContent value="list" className="mt-0">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+            {assets.map((asset) => (
+              <AssetGridItem key={asset.id} asset={asset} />
+            ))}
+          </div>
+        </TabsContent>
+        <TabsContent value="map" className="mt-0">
+          <div className="h-[600px] rounded-md overflow-hidden border">
+            <AssetMap assets={assets} height="100%" />
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

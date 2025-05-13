@@ -297,3 +297,16 @@ export async function searchProperties(query: string): Promise<Asset[]> {
     return []
   }
 }
+
+// Get filtered properties
+export async function getFilteredProperties(filters: Record<string, string | undefined>): Promise<Asset[]> {
+  try {
+    // For now, we'll use the sample data from firestore.ts
+    // In a real implementation, this would use Firestore queries
+    const allAssets = await import("../firestore").then((module) => module.getAssets(filters as any))
+    return allAssets
+  } catch (error) {
+    console.error("Error fetching filtered properties:", error)
+    return []
+  }
+}

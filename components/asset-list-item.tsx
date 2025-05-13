@@ -11,7 +11,6 @@ import { ConditionalField } from "@/components/permissions/conditional-field"
 import { RestrictedValue } from "@/components/permissions/restricted-value"
 import type { Asset } from "@/types/asset"
 import { formatCurrency, marketingStatusLabels, propertyTypeLabels } from "@/types/asset"
-import { useAuth } from "@/context/auth-context"
 
 // Dynamically import the map component with no SSR
 const PostalCodeMap = dynamic(() => import("./maps/postal-code-map"), {
@@ -23,23 +22,11 @@ const PostalCodeMap = dynamic(() => import("./maps/postal-code-map"), {
   ),
 })
 
-// Dynamically import the cadastral map component with no SSR
-const CadastralMap = dynamic(() => import("./maps/cadastral-map"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-full w-full bg-muted">
-      <p className="text-muted-foreground">Cargando mapa catastral...</p>
-    </div>
-  ),
-})
-
 interface AssetListItemProps {
   asset: Asset
 }
 
 export function AssetListItem({ asset }: AssetListItemProps) {
-  const { user } = useAuth()
-  const isAdmin = user?.role === "admin"
   const propertyType = propertyTypeLabels[asset.property_type] || asset.property_type
   const marketingStatus =
     marketingStatusLabels[asset.marketing_status || "AVAILABLE"] || asset.marketing_status || "Disponible"
@@ -50,22 +37,7 @@ export function AssetListItem({ asset }: AssetListItemProps) {
         <div className="relative h-48 md:h-auto md:w-1/3 md:max-w-xs">
           {/* Map area */}
           <ConditionalField fieldName="zip_code">
-            {isAdmin ? (
-              // Show cadastral map for admins
-              <CadastralMap
-                reference={asset.cadastral_reference || asset.reference_code}
-                fallback={
-                  asset.zip_code ? (
-                    <PostalCodeMap postalCode={asset.zip_code} />
-                  ) : (
-                    <div className="flex items-center justify-center h-full w-full bg-muted">
-                      <p className="text-muted-foreground">No hay referencia catastral disponible</p>
-                    </div>
-                  )
-                }
-              />
-            ) : // Show postal code map for non-admins
-            asset.zip_code ? (
+            {asset.zip_code ? (
               <RestrictedValue
                 fieldName="zip_code"
                 value={<PostalCodeMap postalCode={asset.zip_code} />}
