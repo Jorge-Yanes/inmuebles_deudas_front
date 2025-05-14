@@ -3,14 +3,20 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
+  where,
+  orderBy,
+  limit as fbLimit,
+  startAfter,
   type Timestamp,
   type DocumentData,
   type QueryDocumentSnapshot,
+  type DocumentSnapshot,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Asset, AssetFilter } from "@/types/asset"
 import type { User } from "@/types/user"
-import { normalizeText } from "@/lib/utils"
+// remove unused import
 
 // Cache for property data to improve performance
 const propertyCache = new Map<string, Asset>()
@@ -22,7 +28,11 @@ const convertTimestamp = (timestamp: Timestamp | undefined): Date | undefined =>
 }
 
 // Convert Firestore document to Asset type
-export const convertDocToAsset = (doc: DocumentData): Asset => {
+// Convert Firestore document to Asset type
+// Convert Firestore document to Asset type
+export const convertDocToAsset = (
+  doc: QueryDocumentSnapshot<DocumentData> | DocumentSnapshot<DocumentData>
+): Asset => {
   const data = doc.data()
 
   // Handle potential data inconsistencies
@@ -157,34 +167,62 @@ export async function getProperties(
   user?: User | null,
 ): Promise<{ properties: Asset[]; lastVisible: QueryDocumentSnapshot<DocumentData> | null }> {
   try {
-    console.log("Property service: Getting properties with filters:", filters)
-
-    // For now, we'll use the sample data from firestore.ts
-    // In a real implementation, this would use Firestore queries
-    const allAssets = await import("../firestore").then((module) => module.getAssets(filters))
-
-    console.log("Property service: Got assets:", allAssets.length)
-
-    // Apply pagination
-    const startIndex = lastVisible ? Number.parseInt(lastVisible.id, 10) : 0
-    const endIndex = startIndex + pageSize
-    const paginatedAssets = allAssets.slice(startIndex, endIndex)
-
-    // Create a mock lastVisible document for pagination
-    const newLastVisible =
-      paginatedAssets.length > 0
-        ? ({ id: String(startIndex + paginatedAssets.length) } as QueryDocumentSnapshot<DocumentData>)
-        : null
-
-    // Check if there are more assets
-    const hasMore = endIndex < allAssets.length
-
-    console.log("Property service: Returning paginated assets:", paginatedAssets.length, "hasMore:", hasMore)
-
-    return {
-      properties: paginatedAssets,
-      lastVisible: hasMore ? newLastVisible : null,
+    // Build Firestore query with filters
+    let q = query(collection(db, "inmueblesMayo"))
+    if (filters) {
+      if (filters.reference_code) {
+        q = query(q, where("reference_code", "==", filters.reference_code))
+      }
+      if (filters.ndg) {
+        q = query(q, where("ndg", "==", filters.ndg))
+      }
+      if (filters.city) {
+        q = query(q, where("city", "==", filters.city))
+      }
+      if (filters.province) {
+        q = query(q, where("province", "==", filters.province))
+      }
+      if (filters.property_type) {
+        q = query(q, where("property_type", "==", filters.property_type))
+      }
+      if (filters.marketing_status) {
+        q = query(q, where("marketing_status", "==", filters.marketing_status))
+      }
+      if (filters.legal_phase) {
+        q = query(q, where("legal_phase", "==", filters.legal_phase))
+      }
+      if (filters.minPrice !== undefined) {
+        q = query(q, where("price_approx", ">=", filters.minPrice))
+      }
+      if (filters.maxPrice !== undefined) {
+        q = query(q, where("price_approx", "<=", filters.maxPrice))
+      }
+      if (filters.minSqm !== undefined) {
+        q = query(q, where("sqm", ">=", filters.minSqm))
+      }
+      if (filters.maxSqm !== undefined) {
+        q = query(q, where("sqm", "<=", filters.maxSqm))
+      }
+      if (filters.startDate) {
+        q = query(q, where("createdAt", ">=", filters.startDate))
+      }
+      if (filters.endDate) {
+        q = query(q, where("createdAt", "<=", filters.endDate))
+      }
     }
+    // Apply ordering
+    q = query(q, orderBy("createdAt", "desc"))
+    // Apply cursor pagination if available
+    if (lastVisible) {
+      q = query(q, startAfter(lastVisible))
+    }
+    // Limit the number of documents
+    q = query(q, fbLimit(pageSize))
+
+    const snapshot = await getDocs(q)
+    const properties = snapshot.docs.map((doc) => convertDocToAsset(doc))
+    const newLastVisible = snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null
+    return { properties, lastVisible: newLastVisible }
   } catch (error) {
     console.error("Error fetching properties:", error)
     return { properties: [], lastVisible: null }

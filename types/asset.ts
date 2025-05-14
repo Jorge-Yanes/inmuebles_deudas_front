@@ -84,19 +84,19 @@ export interface Asset {
 }
 
 export interface AssetFilter {
-  type?: string
-  status?: string
-  location?: string
+  reference_code?: string
+  ndg?: string
   province?: string
   city?: string
+  property_type?: string
+  marketing_status?: string
+  legal_phase?: string
   minPrice?: number
   maxPrice?: number
   minSqm?: number
   maxSqm?: number
-  property_type?: string
-  legal_phase?: string
-  marketing_status?: string
-  query?: string
+  startDate?: Date
+  endDate?: Date
 }
 
 // Mapeo de campos en español para mostrar en la UI
