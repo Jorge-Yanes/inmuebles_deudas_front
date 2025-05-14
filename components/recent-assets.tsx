@@ -8,7 +8,7 @@ import { ArrowUpRight, Building, Home, MapPin } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
-import { getRecentAssets } from "@/lib/firestore/property-service"
+import { getProperties } from "@/lib/firestore/property-service"
 import type { Asset } from "@/types/asset"
 import { formatCurrency, marketingStatusLabels, propertyTypeLabels } from "@/types/asset"
 import { useAuth } from "@/context/auth-context"
@@ -17,27 +17,24 @@ export function RecentAssets() {
   const { user, checkPermission } = useAuth()
   const [assets, setAssets] = useState<Asset[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchAssets = async () => {
       try {
         setLoading(true)
-        setError(null)
-
         // Only fetch assets if user has permission to view assets
         if (user && checkPermission("viewAssets")) {
-          // Use getRecentAssets to fetch the 3 most recent assets
-          const recentAssets = await getRecentAssets(user.uid, 3)
-
-          // Ensure we always set a valid array
-          setAssets(recentAssets || [])
+          // Use getProperties with a limit of 3 and sort by createdAt desc
+          const result = await getProperties(
+            {}, // No filters
+            3, // Limit to 3 recent assets
+            undefined, // No pagination
+            user, // Pass user for permissions
+          )
+          setAssets(result.properties)
         }
-      } catch (err) {
-        console.error("Error fetching recent assets:", err)
-        setError("Error loading recent assets. Please try again later.")
-        // Ensure assets is always a valid array even on error
-        setAssets([])
+      } catch (error) {
+        console.error("Error fetching recent assets:", error)
       } finally {
         setLoading(false)
       }
@@ -66,15 +63,6 @@ export function RecentAssets() {
     )
   }
 
-  if (error) {
-    return (
-      <div className="rounded-lg border border-destructive p-8 text-center">
-        <h3 className="text-lg font-semibold text-destructive">Error</h3>
-        <p className="mt-2 text-muted-foreground">{error}</p>
-      </div>
-    )
-  }
-
   if (!user || !checkPermission("viewAssets")) {
     return (
       <div className="rounded-lg border border-dashed p-8 text-center">
@@ -84,8 +72,7 @@ export function RecentAssets() {
     )
   }
 
-  // Ensure assets is always a valid array before checking length
-  if (!assets || assets.length === 0) {
+  if (assets.length === 0) {
     return (
       <div className="rounded-lg border border-dashed p-8 text-center">
         <h3 className="text-lg font-semibold">No hay activos recientes</h3>
@@ -97,10 +84,7 @@ export function RecentAssets() {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {assets.map((asset) => {
-        // Ensure we have valid data before accessing properties
-        if (!asset) return null
-
-        const propertyType = propertyTypeLabels[asset.property_type] || asset.property_type || "Otro"
+        const propertyType = propertyTypeLabels[asset.property_type] || asset.property_type
         const marketingStatus =
           marketingStatusLabels[asset.marketing_status || "AVAILABLE"] || asset.marketing_status || "Disponible"
 
@@ -110,9 +94,9 @@ export function RecentAssets() {
               <Image
                 src={
                   asset.imageUrl ||
-                  `/placeholder.svg?height=200&width=400&text=${encodeURIComponent(asset.reference_code || asset.id || "")}`
+                  `/placeholder.svg?height=200&width=400&text=${encodeURIComponent(asset.reference_code || asset.id)}`
                 }
-                alt={asset.title || `${propertyType} en ${asset.city || ""}` || "Propiedad"}
+                alt={asset.title || `${propertyType} en ${asset.city}`}
                 fill
                 className="object-cover"
               />
@@ -124,12 +108,10 @@ export function RecentAssets() {
               </Badge>
             </div>
             <CardContent className="p-4">
-              <h3 className="text-xl font-semibold">{asset.title || `${propertyType} en ${asset.city || ""}`}</h3>
+              <h3 className="text-xl font-semibold">{asset.title || `${propertyType} en ${asset.city}`}</h3>
               <div className="mt-2 flex items-center text-sm text-muted-foreground">
                 <MapPin className="mr-1 h-4 w-4" />
-                {asset.address ? `${asset.address}, ` : ""}
-                {asset.city ? `${asset.city}, ` : ""}
-                {asset.province || ""}
+                {asset.address}, {asset.city}, {asset.province}
               </div>
               <div className="mt-1 flex items-center text-sm text-muted-foreground">
                 {asset.property_type === "RESIDENTIAL" ? (
@@ -139,12 +121,10 @@ export function RecentAssets() {
                 )}
                 {propertyType}
               </div>
-              {canViewFinancialData && asset.price_approx ? (
+              {canViewFinancialData ? (
                 <p className="mt-2 text-lg font-bold">{formatCurrency(asset.price_approx)}</p>
               ) : (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {canViewFinancialData ? "Precio no disponible" : "Precio: Requiere permisos adicionales"}
-                </p>
+                <p className="mt-2 text-sm text-muted-foreground">Precio: Requiere permisos adicionales</p>
               )}
             </CardContent>
             <CardFooter className="p-4 pt-0">

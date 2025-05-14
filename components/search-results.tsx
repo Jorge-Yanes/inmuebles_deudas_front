@@ -6,10 +6,11 @@ import { List, MapPin } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { searchProperties, getFilteredProperties } from "@/lib/firestore/property-service"
+import { getFilteredProperties, getAllProperties } from "@/lib/firestore/property-service"
 import type { Asset } from "@/types/asset"
 import { AssetGridItem } from "@/components/asset-grid-item"
 import AssetMap from "@/components/maps/asset-map"
+import { normalizeText } from "@/lib/utils"
 
 interface SearchResultsProps {
   query: string
@@ -25,19 +26,51 @@ export function SearchResults({ query, view = "list", searchParams = {} }: Searc
   const [loading, setLoading] = useState(true)
   const [activeView, setActiveView] = useState<"list" | "map">(view === "map" ? "map" : "list")
   const [sortOption, setSortOption] = useState<"relevance" | "price">("relevance")
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchResults = async () => {
       setLoading(true)
+      setError(null)
+
       try {
         let results: Asset[] = []
 
+        // To avoid index requirements, we'll use a client-side approach
         if (query.trim()) {
-          // If there's a search query, use search
-          results = await searchProperties(query)
-        } else {
-          // Otherwise use filters
+          // If there's a search query, get all properties and filter client-side
+          const allProperties = await getAllProperties(500)
+          const normalizedQuery = normalizeText(query.toLowerCase())
+
+          results = allProperties.filter((asset) => {
+            // Search across multiple fields
+            const searchableFields = [
+              asset.reference_code,
+              asset.address,
+              asset.city,
+              asset.province,
+              asset.property_type,
+              asset.property_general_subtype,
+              asset.marketing_status,
+              asset.legal_phase,
+              asset.extras,
+            ]
+              .filter(Boolean)
+              .map((field) => normalizeText(field || ""))
+
+            return searchableFields.some((field) => field.includes(normalizedQuery))
+          })
+        } else if (Object.values(searchParams).some((param) => param && param !== "ALL")) {
+          // If there are filters, use getFilteredProperties
           results = await getFilteredProperties(searchParams)
+        } else {
+          // No search query or filters, just get recent properties
+          const allProperties = await getAllProperties(50)
+          results = allProperties.sort((a, b) => {
+            const dateA = a.createdAt?.getTime() || 0
+            const dateB = b.createdAt?.getTime() || 0
+            return dateB - dateA // Descending order (newest first)
+          })
         }
 
         // Sort results
@@ -48,6 +81,7 @@ export function SearchResults({ query, view = "list", searchParams = {} }: Searc
         setAssets(results)
       } catch (error) {
         console.error("Error fetching assets:", error)
+        setError("Error al cargar los activos inmobiliarios. Por favor, inténtalo de nuevo.")
       } finally {
         setLoading(false)
       }
@@ -60,7 +94,7 @@ export function SearchResults({ query, view = "list", searchParams = {} }: Searc
     setActiveView(view)
 
     // Update URL to persist view preference
-    const params = new URLSearchParams(urlSearchParams)
+    const params = new URLSearchParams(urlSearchParams.toString())
     params.set("view", view)
     router.push(`${pathname}?${params.toString()}`)
   }
@@ -76,6 +110,33 @@ export function SearchResults({ query, view = "list", searchParams = {} }: Searc
           <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
           <p className="text-muted-foreground">Buscando activos inmobiliarios...</p>
         </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center">
+        <div className="text-red-500 mb-4">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+        </div>
+        <h3 className="text-xl font-semibold mb-2">Error</h3>
+        <p className="text-muted-foreground max-w-md mb-4">{error}</p>
+        <Button onClick={() => window.location.reload()}>Intentar de nuevo</Button>
       </div>
     )
   }

@@ -1,24 +1,20 @@
-import { db } from "@/lib/firebase"
 import {
   collection,
-  query,
-  where,
-  getDocs,
   doc,
   getDoc,
+  getDocs,
+  query,
   orderBy,
   limit,
   startAfter,
+  type Timestamp,
   type DocumentData,
   type QueryDocumentSnapshot,
-  Timestamp,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  type QueryConstraint,
 } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 import type { Asset, AssetFilter } from "@/types/asset"
-import { generateTitle, generateDescription, normalizeText } from "@/lib/utils"
+import type { User } from "@/types/user"
+import { normalizeText } from "@/lib/utils"
 
 // Cache for property data to improve performance
 const propertyCache = new Map<string, Asset>()
@@ -30,118 +26,112 @@ const convertTimestamp = (timestamp: Timestamp | undefined): Date | undefined =>
 }
 
 // Convert Firestore document to Asset type
-const convertDocToAsset = (doc: DocumentData): Asset => {
+export const convertDocToAsset = (doc: DocumentData): Asset => {
   const data = doc.data()
 
-  // Handle Firestore Timestamp conversion to Date
-  const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : data.createdAt || new Date()
-
-  const fechaSubasta = data.fecha_subasta instanceof Timestamp ? data.fecha_subasta.toDate() : data.fecha_subasta
-
-  return {
+  // Handle potential data inconsistencies
+  const asset: Asset = {
     id: doc.id,
     ndg: data.ndg || "",
-    property_id: data.property_id || 0,
+    lien: data.lien || undefined,
+    property_id: data.property_id || undefined,
     reference_code: data.reference_code || "",
-    property_type: data.property_type || "",
-    property_general_subtype: data.property_general_subtype || "",
+    parcel: data.parcel || undefined,
+    cadastral_reference: data.cadastral_reference || undefined,
+    property_idh: data.property_idh || undefined,
+    property_bank_id: data.property_bank_id || undefined,
+    alt_id1: data.alt_id1 || undefined,
+    idufir: data.idufir || undefined,
+    id_portal_subasta: data.id_portal_subasta || undefined,
+
+    // Property information
+    property_type: data.property_type || "OTHER",
+    property_general_subtype: data.property_general_subtype || undefined,
+    title: data.title || undefined,
+    description: data.description || undefined,
+
+    // Location
     province: data.province || "",
     city: data.city || "",
     address: data.address || "",
-    zip_code: data.zip_code || "",
-    floor: data.floor || "",
-    door: data.door || "",
+    numero: data.numero || undefined,
+    street_type: data.street_type || undefined,
+    street_no: data.street_no || undefined,
+    zip_code: data.zip_code || undefined,
+    floor: data.floor || undefined,
+    door: data.door || undefined,
+    comarca: data.comarca || undefined,
+
+    // Physical characteristics
     sqm: data.sqm || 0,
-    rooms: data.rooms || 0,
-    bathrooms: data.bathrooms || 0,
-    has_parking: data.has_parking || 0,
-    extras: data.extras || "",
-    price_approx: data.price_approx || 0,
-    auction_base: data.auction_base || 0,
-    legal_phase: data.legal_phase || "",
-    marketing_status: data.marketing_status || "",
-    estado_posesion_fisica: data.estado_posesion_fisica || "",
-    fecha_subasta: fechaSubasta,
-    imageUrl: data.imageUrl || "/placeholder.svg?height=200&width=400",
-    createdAt: createdAt,
-    title: data.title || "",
-    description: data.description || "",
-    cadastral_reference: data.cadastral_reference || "",
+    rooms: data.rooms || undefined,
+    bathrooms: data.bathrooms || undefined,
+    has_parking: data.has_parking || undefined,
+    extras: data.extras || undefined,
+
+    // Financial information
+    gbv: data.gbv || undefined,
+    auction_base: data.auction_base || undefined,
+    deuda: data.deuda || undefined,
+    auction_value: data.auction_value || undefined,
+    price_approx: data.price_approx || undefined,
+    price_to_brokers: data.price_to_brokers || undefined,
+    ob: data.ob || undefined,
+
+    // Legal information
+    legal_type: data.legal_type || undefined,
+    legal_phase: data.legal_phase || undefined,
+    tipo_procedimiento: data.tipo_procedimiento || undefined,
+    fase_procedimiento: data.fase_procedimiento || undefined,
+    fase_actual: data.fase_actual || undefined,
+
+    // Status
+    registration_status: data.registration_status || undefined,
+    working_status: data.working_status || undefined,
+    marketing_status: data.marketing_status || undefined,
+    marketing_suspended_reason: data.marketing_suspended_reason || undefined,
+    estado_posesion_fisica: data.estado_posesion_fisica || undefined,
+
+    // Dates
+    closing_date: convertTimestamp(data.closing_date),
+    portfolio_closing_date: convertTimestamp(data.portfolio_closing_date),
+    date_under_re_mgmt: convertTimestamp(data.date_under_re_mgmt),
+    fecha_subasta: convertTimestamp(data.fecha_subasta),
+    fecha_cesion_remate: convertTimestamp(data.fecha_cesion_remate),
+
+    // Additional information
+    campania: data.campania || undefined,
+    portfolio: data.portfolio || undefined,
+    borrower_name: data.borrower_name || undefined,
+    hip_under_re_mgmt: data.hip_under_re_mgmt || undefined,
+    reference_code_1: data.reference_code_1 || undefined,
+
+    // UI fields
+    imageUrl: data.imageUrl || undefined,
+    features: data.features || [],
+    documents: data.documents || [],
+    history: data.history || [],
+    createdAt: convertTimestamp(data.createdAt) || new Date(),
   }
-}
 
-// Get all properties with optional filtering
-export async function getProperties(
-  filters?: AssetFilter,
-  pageSize = 10,
-  lastDoc?: QueryDocumentSnapshot<DocumentData>,
-): Promise<{ assets: Asset[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null }> {
-  try {
-    const propertiesRef = collection(db, "properties")
-    const constraints: QueryConstraint[] = []
-
-    // Add filters if provided
-    if (filters) {
-      if (filters.property_type && filters.property_type !== "ALL") {
-        constraints.push(where("property_type", "==", filters.property_type))
-      }
-      if (filters.marketing_status && filters.marketing_status !== "ALL") {
-        constraints.push(where("marketing_status", "==", filters.marketing_status))
-      }
-      if (filters.legal_phase && filters.legal_phase !== "ALL") {
-        constraints.push(where("legal_phase", "==", filters.legal_phase))
-      }
-      if (filters.province && filters.province !== "ALL") {
-        constraints.push(where("province", "==", filters.province))
-      }
-      if (filters.city && filters.city !== "ALL") {
-        constraints.push(where("city", "==", filters.city))
-      }
-      // Note: For range filters (price, sqm), we'd need composite indexes or separate queries
-    }
-
-    // Add ordering and pagination
-    constraints.push(orderBy("createdAt", "desc"))
-    constraints.push(limit(pageSize))
-
-    // Add startAfter if we have a last document
-    if (lastDoc) {
-      constraints.push(startAfter(lastDoc))
-    }
-
-    const q = query(propertiesRef, ...constraints)
-    const querySnapshot = await getDocs(q)
-
-    const assets: Asset[] = []
-    let lastVisible: QueryDocumentSnapshot<DocumentData> | null = null
-
-    querySnapshot.forEach((doc) => {
-      const asset = convertDocToAsset(doc)
-
-      // Generate title and description if not available
-      if (!asset.title) {
-        asset.title = generateTitle(asset)
-      }
-      if (!asset.description) {
-        asset.description = generateDescription(asset)
-      }
-
-      assets.push(asset)
-      lastVisible = doc
-    })
-
-    return { assets, lastDoc: lastVisible }
-  } catch (error) {
-    console.error("Error getting properties:", error)
-    return { assets: [], lastDoc: null }
-  }
+  return asset
 }
 
 // Get a single property by ID
-export async function getPropertyById(id: string): Promise<Asset | null> {
+export async function getPropertyById(id: string, user?: User | null): Promise<Asset | null> {
   try {
-    const propertyRef = doc(db, "properties", id)
-    const propertyDoc = await getDoc(propertyRef)
+    // Check cache first
+    if (propertyCache.has(id)) {
+      const cachedData = propertyCache.get(id)!
+      const cacheTime = cachedData.cacheTime as unknown as number
+
+      // Return cached data if it's still valid
+      if (cacheTime && Date.now() - cacheTime < CACHE_EXPIRY) {
+        return cachedData
+      }
+    }
+
+    const propertyDoc = await getDoc(doc(db, "inmuebles", id))
 
     if (!propertyDoc.exists()) {
       return null
@@ -149,71 +139,223 @@ export async function getPropertyById(id: string): Promise<Asset | null> {
 
     const asset = convertDocToAsset(propertyDoc)
 
-    // Generate title and description if not available
-    if (!asset.title) {
-      asset.title = generateTitle(asset)
+    // Add to cache with timestamp
+    const assetWithCache = {
+      ...asset,
+      cacheTime: Date.now(),
     }
-    if (!asset.description) {
-      asset.description = generateDescription(asset)
-    }
+    propertyCache.set(id, assetWithCache)
 
     return asset
   } catch (error) {
-    console.error("Error getting property by ID:", error)
-    return null
+    console.error("Error fetching property:", error)
+    throw new Error("Failed to fetch property details")
   }
 }
 
-// Search properties by query string
-export async function searchProperties(query: string): Promise<Asset[]> {
+// Get all properties without any filtering or sorting - avoids index requirements
+export async function getAllProperties(limit = 500): Promise<Asset[]> {
   try {
-    // In a production app, you would use a proper search service like Algolia
-    // For now, we'll do a simple search across multiple fields
-    const propertiesRef = collection(db, "properties")
-    const querySnapshot = await getDocs(propertiesRef)
+    // Simple query with just a limit - no filtering or sorting
+    const propertiesQuery = query(collection(db, "inmuebles"), limit)
+    const querySnapshot = await getDocs(propertiesQuery)
 
-    const normalizedQuery = normalizeText(query)
-    const results: Asset[] = []
+    const properties: Asset[] = []
 
     querySnapshot.forEach((doc) => {
       const asset = convertDocToAsset(doc)
-
-      // Generate title and description if not available
-      if (!asset.title) {
-        asset.title = generateTitle(asset)
-      }
-      if (!asset.description) {
-        asset.description = generateDescription(asset)
-      }
-
-      // Search across multiple fields
-      if (
-        normalizeText(asset.title).includes(normalizedQuery) ||
-        normalizeText(asset.description).includes(normalizedQuery) ||
-        normalizeText(asset.address || "").includes(normalizedQuery) ||
-        normalizeText(asset.city || "").includes(normalizedQuery) ||
-        normalizeText(asset.province || "").includes(normalizedQuery) ||
-        normalizeText(asset.property_type || "").includes(normalizedQuery) ||
-        normalizeText(asset.property_general_subtype || "").includes(normalizedQuery) ||
-        normalizeText(asset.reference_code || "").includes(normalizedQuery) ||
-        normalizeText(asset.extras || "").includes(normalizedQuery)
-      ) {
-        results.push(asset)
-      }
+      properties.push(asset)
     })
 
-    return results
+    return properties
   } catch (error) {
-    console.error("Error searching properties:", error)
+    console.error("Error fetching all properties:", error)
     return []
   }
 }
 
-// Get property statistics - renamed from getAssetStats to maintain compatibility
-export async function getPropertyStats(userId?: string) {
+// Get properties with pagination and filtering - Modified to completely avoid composite indexes
+export async function getProperties(
+  filters?: AssetFilter,
+  pageSize = 10,
+  lastVisible?: QueryDocumentSnapshot<DocumentData>,
+  user?: User | null,
+): Promise<{ properties: Asset[]; lastVisible: QueryDocumentSnapshot<DocumentData> | null }> {
   try {
-    const propertiesRef = collection(db, "properties")
-    const querySnapshot = await getDocs(propertiesRef)
+    console.log("Property service: Getting properties with filters:", filters)
+
+    // To avoid requiring composite indexes, we'll use different strategies:
+
+    // 1. If no filters are applied, we can use orderBy safely
+    if (!filters || Object.values(filters).every((v) => !v || v === "ALL")) {
+      // No filters, just sort by createdAt
+      const simpleQuery = query(collection(db, "inmuebles"), orderBy("createdAt", "desc"), limit(pageSize))
+
+      // Apply pagination for non-filtered queries
+      if (lastVisible) {
+        const paginatedQuery = query(
+          collection(db, "inmuebles"),
+          orderBy("createdAt", "desc"),
+          startAfter(lastVisible),
+          limit(pageSize),
+        )
+
+        const querySnapshot = await getDocs(paginatedQuery)
+        const properties: Asset[] = []
+        let newLastVisible: QueryDocumentSnapshot<DocumentData> | null = null
+
+        querySnapshot.forEach((doc) => {
+          properties.push(convertDocToAsset(doc))
+          newLastVisible = doc
+        })
+
+        return { properties, lastVisible: newLastVisible }
+      }
+
+      const querySnapshot = await getDocs(simpleQuery)
+      const properties: Asset[] = []
+      let newLastVisible: QueryDocumentSnapshot<DocumentData> | null = null
+
+      querySnapshot.forEach((doc) => {
+        properties.push(convertDocToAsset(doc))
+        newLastVisible = doc
+      })
+
+      return { properties, lastVisible: newLastVisible }
+    }
+
+    // 2. For filtered queries, we'll fetch all properties and filter client-side
+    // This is less efficient but avoids index requirements
+    const allProperties = await getAllProperties(500) // Limit to 500 to avoid excessive reads
+
+    // Apply filters client-side
+    let filteredProperties = allProperties
+
+    if (filters) {
+      filteredProperties = allProperties.filter((asset) => {
+        let include = true
+
+        // Apply all filters
+        if (filters.property_type && filters.property_type !== "ALL" && asset.property_type !== filters.property_type) {
+          include = false
+        }
+
+        if (
+          include &&
+          filters.marketing_status &&
+          filters.marketing_status !== "ALL" &&
+          asset.marketing_status !== filters.marketing_status
+        ) {
+          include = false
+        }
+
+        if (
+          include &&
+          filters.legal_phase &&
+          filters.legal_phase !== "ALL" &&
+          asset.legal_phase !== filters.legal_phase
+        ) {
+          include = false
+        }
+
+        if (include && filters.province && filters.province !== "ALL" && asset.province !== filters.province) {
+          include = false
+        }
+
+        if (include && filters.city && filters.city !== "ALL" && asset.city !== filters.city) {
+          include = false
+        }
+
+        // Apply numeric range filters
+        if (include && filters.minPrice && asset.price_approx && asset.price_approx < filters.minPrice) {
+          include = false
+        }
+
+        if (include && filters.maxPrice && asset.price_approx && asset.price_approx > filters.maxPrice) {
+          include = false
+        }
+
+        if (include && filters.minSqm && asset.sqm && asset.sqm < filters.minSqm) {
+          include = false
+        }
+
+        if (include && filters.maxSqm && asset.sqm && asset.sqm > filters.maxSqm) {
+          include = false
+        }
+
+        return include
+      })
+    }
+
+    // Sort by createdAt manually
+    filteredProperties.sort((a, b) => {
+      const dateA = a.createdAt?.getTime() || 0
+      const dateB = b.createdAt?.getTime() || 0
+      return dateB - dateA // Descending order (newest first)
+    })
+
+    // Handle pagination manually
+    let startIndex = 0
+    if (lastVisible) {
+      // Find the index of the last visible item
+      const lastId = lastVisible.id
+      const lastIndex = filteredProperties.findIndex((asset) => asset.id === lastId)
+      if (lastIndex !== -1) {
+        startIndex = lastIndex + 1
+      }
+    }
+
+    // Get the current page of results
+    const endIndex = startIndex + pageSize
+    const pagedProperties = filteredProperties.slice(startIndex, endIndex)
+
+    // Set the last visible doc for pagination
+    let newLastVisible: QueryDocumentSnapshot<DocumentData> | null = null
+    if (pagedProperties.length > 0) {
+      const lastId = pagedProperties[pagedProperties.length - 1].id
+      // This is a mock last visible document since we're not using Firestore's pagination
+      newLastVisible = { id: lastId } as QueryDocumentSnapshot<DocumentData>
+    }
+
+    return {
+      properties: pagedProperties,
+      lastVisible: newLastVisible,
+    }
+  } catch (error) {
+    console.error("Error fetching properties:", error)
+    return { properties: [], lastVisible: null }
+  }
+}
+
+// Get unique values for filters
+export async function getUniqueFieldValues(field: string): Promise<string[]> {
+  try {
+    const querySnapshot = await getDocs(collection(db, "inmuebles"))
+    const uniqueValues = new Set<string>()
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      if (data[field]) {
+        uniqueValues.add(data[field])
+      }
+    })
+
+    return Array.from(uniqueValues).sort()
+  } catch (error) {
+    console.error(`Error fetching unique ${field} values:`, error)
+    return []
+  }
+}
+
+// Get property statistics
+export async function getPropertyStats(userId?: string): Promise<{
+  totalProperties: number
+  totalValue: number
+  totalLocations: number
+  averageValue: number
+}> {
+  try {
+    const querySnapshot = await getDocs(collection(db, "inmuebles"))
 
     let totalProperties = 0
     let totalValue = 0
@@ -232,17 +374,16 @@ export async function getPropertyStats(userId?: string) {
       }
     })
 
-    const totalLocations = locations.size
     const averageValue = totalProperties > 0 ? Math.round(totalValue / totalProperties) : 0
 
     return {
       totalProperties,
       totalValue,
-      totalLocations,
+      totalLocations: locations.size,
       averageValue,
     }
   } catch (error) {
-    console.error("Error getting property stats:", error)
+    console.error("Error fetching property stats:", error)
     return {
       totalProperties: 0,
       totalValue: 0,
@@ -252,169 +393,45 @@ export async function getPropertyStats(userId?: string) {
   }
 }
 
-// Get recent assets
-export async function getRecentAssets(userId?: string, count = 3) {
+// Search properties by text query - client-side approach
+export async function searchProperties(query: string): Promise<Asset[]> {
   try {
-    const propertiesRef = collection(db, "properties")
-    const q = query(propertiesRef, orderBy("createdAt", "desc"), limit(count))
-    const querySnapshot = await getDocs(q)
-
-    const assets: Asset[] = []
-    querySnapshot.forEach((doc) => {
-      const asset = convertDocToAsset(doc)
-
-      // Generate title and description if not available
-      if (!asset.title) {
-        asset.title = generateTitle(asset)
-      }
-      if (!asset.description) {
-        asset.description = generateDescription(asset)
-      }
-
-      assets.push(asset)
-    })
-
-    return assets
-  } catch (error) {
-    console.error("Error getting recent assets:", error)
-    return []
-  }
-}
-
-// Get all unique locations (cities)
-export async function getLocations(): Promise<string[]> {
-  try {
-    const propertiesRef = collection(db, "properties")
-    const querySnapshot = await getDocs(propertiesRef)
-
-    const locations = new Set<string>()
-    querySnapshot.forEach((doc) => {
-      const data = doc.data()
-      if (data.city) {
-        locations.add(data.city)
-      }
-    })
-
-    return Array.from(locations).sort()
-  } catch (error) {
-    console.error("Error getting locations:", error)
-    return []
-  }
-}
-
-// Get all unique provinces
-export async function getProvinces(): Promise<string[]> {
-  try {
-    const propertiesRef = collection(db, "properties")
-    const querySnapshot = await getDocs(propertiesRef)
-
-    const provinces = new Set<string>()
-    querySnapshot.forEach((doc) => {
-      const data = doc.data()
-      if (data.province) {
-        provinces.add(data.province)
-      }
-    })
-
-    return Array.from(provinces).sort()
-  } catch (error) {
-    console.error("Error getting provinces:", error)
-    return []
-  }
-}
-
-// Get all unique asset types
-export async function getAssetTypes(): Promise<string[]> {
-  try {
-    const propertiesRef = collection(db, "properties")
-    const querySnapshot = await getDocs(propertiesRef)
-
-    const types = new Set<string>()
-    querySnapshot.forEach((doc) => {
-      const data = doc.data()
-      if (data.property_type) {
-        types.add(data.property_type)
-      }
-    })
-
-    return Array.from(types).sort()
-  } catch (error) {
-    console.error("Error getting asset types:", error)
-    return []
-  }
-}
-
-// Create a new asset
-export async function createAsset(assetData: Partial<Asset>): Promise<string | null> {
-  try {
-    const propertiesRef = collection(db, "properties")
-
-    // Add createdAt timestamp if not provided
-    if (!assetData.createdAt) {
-      assetData.createdAt = new Date()
+    if (!query.trim()) {
+      return []
     }
 
-    const docRef = await addDoc(propertiesRef, assetData)
-    return docRef.id
-  } catch (error) {
-    console.error("Error creating asset:", error)
-    return null
-  }
-}
+    // Get all properties and filter client-side
+    const allProperties = await getAllProperties(500)
+    const normalizedQuery = normalizeText(query.toLowerCase())
 
-// Update an existing asset
-export async function updateAsset(id: string, assetData: Partial<Asset>): Promise<boolean> {
-  try {
-    const propertyRef = doc(db, "properties", id)
-    await updateDoc(propertyRef, assetData)
-    return true
-  } catch (error) {
-    console.error("Error updating asset:", error)
-    return false
-  }
-}
+    // Filter by the search query
+    const results = allProperties.filter((asset) => {
+      // Search across multiple fields
+      const searchableFields = [
+        asset.reference_code,
+        asset.address,
+        asset.city,
+        asset.province,
+        asset.property_type,
+        asset.property_general_subtype,
+        asset.marketing_status,
+        asset.legal_phase,
+        asset.extras,
+      ]
+        .filter(Boolean)
+        .map((field) => normalizeText(field || ""))
 
-// Delete an asset
-export async function deleteAsset(id: string): Promise<boolean> {
-  try {
-    const propertyRef = doc(db, "properties", id)
-    await deleteDoc(propertyRef)
-    return true
-  } catch (error) {
-    console.error("Error deleting asset:", error)
-    return false
-  }
-}
+      return searchableFields.some((field) => field.includes(normalizedQuery))
+    })
 
-// Check if a user has access to an asset
-export async function checkAssetAccess(userId: string, assetId: string): Promise<boolean> {
-  try {
-    // In a real implementation, you would:
-    // 1. Get the user's permissions from a separate collection
-    // 2. Get the asset details
-    // 3. Check if the user has access based on asset type, province, portfolio, etc.
-
-    // For now, we'll assume all users have access to all assets
-    return true
+    return results
   } catch (error) {
-    console.error("Error checking asset access:", error)
-    return false
-  }
-}
-
-// Get all unique portfolios
-export async function getPortfolios(): Promise<string[]> {
-  try {
-    // In a real implementation, you would query a separate collection for portfolios
-    // For now, we'll return some dummy data
-    return ["Portfolio A", "Portfolio B", "Portfolio C", "Legacy Assets"]
-  } catch (error) {
-    console.error("Error getting portfolios:", error)
+    console.error("Error searching properties:", error)
     return []
   }
 }
 
-// Get filtered properties
+// Get filtered properties - client-side approach
 export async function getFilteredProperties(filters: Record<string, string | undefined>): Promise<Asset[]> {
   try {
     // Convert the filters to the AssetFilter type
@@ -433,104 +450,54 @@ export async function getFilteredProperties(filters: Record<string, string | und
 
     // Use the getProperties function to get filtered properties
     const result = await getProperties(assetFilters, 100)
-    return result.assets
+    return result.properties
   } catch (error) {
     console.error("Error fetching filtered properties:", error)
     return []
   }
 }
 
-// Get property types
-export async function getPropertyTypes(): Promise<string[]> {
-  return getAssetTypes()
+// Get provinces
+export async function getProvinces(): Promise<string[]> {
+  return getUniqueFieldValues("province")
 }
 
-// Get marketing statuses
-export async function getMarketingStatuses(): Promise<string[]> {
-  try {
-    const propertiesRef = collection(db, "properties")
-    const querySnapshot = await getDocs(propertiesRef)
-
-    const statuses = new Set<string>()
-    querySnapshot.forEach((doc) => {
-      const data = doc.data()
-      if (data.marketing_status) {
-        statuses.add(data.marketing_status)
-      }
-    })
-
-    return Array.from(statuses).sort()
-  } catch (error) {
-    console.error("Error getting marketing statuses:", error)
-    return []
-  }
-}
-
-// Get legal phases
-export async function getLegalPhases(): Promise<string[]> {
-  try {
-    const propertiesRef = collection(db, "properties")
-    const querySnapshot = await getDocs(propertiesRef)
-
-    const phases = new Set<string>()
-    querySnapshot.forEach((doc) => {
-      const data = doc.data()
-      if (data.legal_phase) {
-        phases.add(data.legal_phase)
-      }
-    })
-
-    return Array.from(phases).sort()
-  } catch (error) {
-    console.error("Error getting legal phases:", error)
-    return []
-  }
-}
-
-// Get cities by province
+// Get cities
 export async function getCities(province?: string): Promise<string[]> {
   try {
-    const propertiesRef = collection(db, "properties")
-    let q = propertiesRef
-
-    if (province && province !== "ALL") {
-      q = query(propertiesRef, where("province", "==", province))
+    // If no province is specified, just get all unique cities
+    if (!province || province === "ALL") {
+      return getUniqueFieldValues("city")
     }
 
-    const querySnapshot = await getDocs(q)
-
+    // Otherwise, get all properties and filter client-side
+    const allProperties = await getAllProperties(500)
     const cities = new Set<string>()
-    querySnapshot.forEach((doc) => {
-      const data = doc.data()
-      if (data.city) {
-        cities.add(data.city)
+
+    allProperties.forEach((asset) => {
+      if (asset.province === province && asset.city) {
+        cities.add(asset.city)
       }
     })
 
     return Array.from(cities).sort()
   } catch (error) {
-    console.error("Error getting cities:", error)
+    console.error("Error fetching cities:", error)
     return []
   }
 }
 
-// Get unique field values
-export async function getUniqueFieldValues(field: string): Promise<string[]> {
-  try {
-    const propertiesRef = collection(db, "properties")
-    const querySnapshot = await getDocs(propertiesRef)
+// Get property types
+export async function getPropertyTypes(): Promise<string[]> {
+  return getUniqueFieldValues("property_type")
+}
 
-    const values = new Set<string>()
-    querySnapshot.forEach((doc) => {
-      const data = doc.data()
-      if (data[field]) {
-        values.add(data[field])
-      }
-    })
+// Get marketing statuses
+export async function getMarketingStatuses(): Promise<string[]> {
+  return getUniqueFieldValues("marketing_status")
+}
 
-    return Array.from(values).sort()
-  } catch (error) {
-    console.error(`Error getting unique ${field} values:`, error)
-    return []
-  }
+// Get legal phases
+export async function getLegalPhases(): Promise<string[]> {
+  return getUniqueFieldValues("legal_phase")
 }
