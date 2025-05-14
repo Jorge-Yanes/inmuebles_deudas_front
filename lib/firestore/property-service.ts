@@ -131,7 +131,7 @@ export async function getPropertyById(id: string, user?: User | null): Promise<A
       }
     }
 
-    const propertyDoc = await getDoc(doc(db, "inmuebles", id))
+    const propertyDoc = await getDoc(doc(db, "inmueblesMayo", id))
 
     if (!propertyDoc.exists()) {
       return null
@@ -157,7 +157,7 @@ export async function getPropertyById(id: string, user?: User | null): Promise<A
 export async function getAllProperties(limit = 500): Promise<Asset[]> {
   try {
     // Simple query with just a limit - no filtering or sorting
-    const propertiesQuery = query(collection(db, "inmuebles"), limit)
+    const propertiesQuery = query(collection(db, "inmueblesMayo"), limit)
     const querySnapshot = await getDocs(propertiesQuery)
 
     const properties: Asset[] = []
@@ -189,12 +189,12 @@ export async function getProperties(
     // 1. If no filters are applied, we can use orderBy safely
     if (!filters || Object.values(filters).every((v) => !v || v === "ALL")) {
       // No filters, just sort by createdAt
-      const simpleQuery = query(collection(db, "inmuebles"), orderBy("createdAt", "desc"), limit(pageSize))
+      const simpleQuery = query(collection(db, "inmueblesMayo"), orderBy("createdAt", "desc"), limit(pageSize))
 
       // Apply pagination for non-filtered queries
       if (lastVisible) {
         const paginatedQuery = query(
-          collection(db, "inmuebles"),
+          collection(db, "inmueblesMayo"),
           orderBy("createdAt", "desc"),
           startAfter(lastVisible),
           limit(pageSize),
@@ -330,7 +330,7 @@ export async function getProperties(
 // Get unique values for filters
 export async function getUniqueFieldValues(field: string): Promise<string[]> {
   try {
-    const querySnapshot = await getDocs(collection(db, "inmuebles"))
+    const querySnapshot = await getDocs(collection(db, "inmueblesMayo"))
     const uniqueValues = new Set<string>()
 
     querySnapshot.forEach((doc) => {
@@ -355,7 +355,7 @@ export async function getPropertyStats(userId?: string): Promise<{
   averageValue: number
 }> {
   try {
-    const querySnapshot = await getDocs(collection(db, "inmuebles"))
+    const querySnapshot = await getDocs(collection(db, "inmueblesMayo"))
 
     let totalProperties = 0
     let totalValue = 0
