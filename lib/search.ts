@@ -1,42 +1,20 @@
-import type { Asset } from "@/types/asset"
-import { sampleAssets } from "./firestore"
+import { searchProperties } from "./firestore/property-service"
 import { normalizeText } from "./utils"
-import { searchProperties } from "@/lib/firestore/property-service"
+import type { Asset } from "@/types/asset"
 
-// This is a client-side search implementation
-// For a production app with large datasets, consider using:
-// 1. Firestore queries with composite indexes
-// 2. Algolia or similar search service integrated with Firestore
-// 3. Server-side search implementation with proper pagination
-
-// Search assets by any field
+// Search assets by query
 export async function searchAssets(query: string): Promise<Asset[]> {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 300))
+  try {
+    if (!query.trim()) {
+      return []
+    }
 
-  if (!query.trim()) {
+    // Use the searchProperties function from property-service
+    return await searchProperties(query)
+  } catch (error) {
+    console.error("Error searching assets:", error)
     return []
   }
-
-  const normalizedQuery = normalizeText(query)
-
-  // Search across all text fields
-  return sampleAssets.filter((asset) => {
-    return (
-      normalizeText(asset.title).includes(normalizedQuery) ||
-      normalizeText(asset.description).includes(normalizedQuery) ||
-      normalizeText(asset.location).includes(normalizedQuery) ||
-      normalizeText(asset.type).includes(normalizedQuery) ||
-      normalizeText(asset.status).includes(normalizedQuery) ||
-      normalizeText(asset.owner).includes(normalizedQuery) ||
-      // Search in numeric fields by converting to string
-      asset.price
-        .toString()
-        .includes(normalizedQuery) ||
-      asset.area.toString().includes(normalizedQuery) ||
-      asset.year.toString().includes(normalizedQuery)
-    )
-  })
 }
 
 // Get search suggestions based on partial input
@@ -91,5 +69,101 @@ export async function getSearchSuggestions(query: string): Promise<string[]> {
   }
 }
 
-// Export the sample assets to make them available for modification
-export { sampleAssets }
+// Filter assets by criteria
+export function filterAssets(assets: Asset[], filters: Record<string, string | number | boolean | undefined>): Asset[] {
+  return assets.filter((asset) => {
+    // Check each filter
+    for (const [key, value] of Object.entries(filters)) {
+      if (value === undefined || value === null || value === "" || value === "ALL") {
+        continue
+      }
+
+      // Handle special cases
+      if (key === "minPrice" && asset.price_approx) {
+        if (asset.price_approx < Number(value)) return false
+      } else if (key === "maxPrice" && asset.price_approx) {
+        if (asset.price_approx > Number(value)) return false
+      } else if (key === "minSqm" && asset.sqm) {
+        if (asset.sqm < Number(value)) return false
+      } else if (key === "maxSqm" && asset.sqm) {
+        if (asset.sqm > Number(value)) return false
+      } else if (key === "query" && typeof value === "string") {
+        // Search in multiple fields
+        const normalizedQuery = normalizeText(value)
+        const searchableFields = [
+          asset.title,
+          asset.description,
+          asset.address,
+          asset.city,
+          asset.province,
+          asset.property_type,
+          asset.property_general_subtype,
+          asset.reference_code,
+          asset.extras,
+        ]
+          .filter(Boolean)
+          .map((field) => normalizeText(field || ""))
+
+        if (!searchableFields.some((field) => field.includes(normalizedQuery))) {
+          return false
+        }
+      } else {
+        // Regular property check
+        const assetValue = (asset as any)[key]
+        if (assetValue === undefined || assetValue === null) return false
+        if (assetValue !== value) return false
+      }
+    }
+
+    return true
+  })
+}
+
+// Sort assets by field
+export function sortAssets(assets: Asset[], field: keyof Asset, direction: "asc" | "desc" = "asc"): Asset[] {
+  return [...assets].sort((a, b) => {
+    const valueA = a[field]
+    const valueB = b[field]
+
+    // Handle undefined values
+    if (valueA === undefined && valueB === undefined) return 0
+    if (valueA === undefined) return direction === "asc" ? 1 : -1
+    if (valueB === undefined) return direction === "asc" ? -1 : 1
+
+    // Compare dates
+    if (valueA instanceof Date && valueB instanceof Date) {
+      return direction === "asc" ? valueA.getTime() - valueB.getTime() : valueB.getTime() - valueA.getTime()
+    }
+
+    // Compare strings
+    if (typeof valueA === "string" && typeof valueB === "string") {
+      return direction === "asc" ? valueA.localeCompare(valueB) : valueB.localeCompare(valueA)
+    }
+
+    // Compare numbers
+    if (typeof valueA === "number" && typeof valueB === "number") {
+      return direction === "asc" ? valueA - valueB : valueB - valueA
+    }
+
+    // Default comparison
+    return 0
+  })
+}
+
+// Group assets by field
+export function groupAssetsByField(assets: Asset[], field: keyof Asset): Record<string, Asset[]> {
+  return assets.reduce(
+    (groups, asset) => {
+      const value = asset[field]
+      const key = value ? String(value) : "Unknown"
+
+      if (!groups[key]) {
+        groups[key] = []
+      }
+
+      groups[key].push(asset)
+      return groups
+    },
+    {} as Record<string, Asset[]>,
+  )
+}

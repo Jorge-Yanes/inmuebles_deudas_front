@@ -15,22 +15,21 @@ export function AssetStats() {
     totalLocations: 0,
     averageValue: 0,
   })
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
+        setLoading(true)
         // Only fetch stats if user has permission to view assets
         if (user && checkPermission("viewAssets")) {
           const data = await getPropertyStats(user.id)
-          setStats({
-            totalAssets: data.totalProperties,
-            totalValue: data.totalValue,
-            totalLocations: data.totalLocations,
-            averageValue: data.averageValue,
-          })
+          setStats(data)
         }
       } catch (error) {
         console.error("Error fetching asset stats:", error)
+      } finally {
+        setLoading(false)
       }
     }
 
@@ -40,6 +39,24 @@ export function AssetStats() {
   // If user doesn't have permission to view financial data, hide financial stats
   const canViewFinancialData = user && checkPermission("viewFinancialData")
 
+  if (loading) {
+    return (
+      <>
+        {[1, 2, 3, 4].map((i) => (
+          <Card key={i} className="animate-pulse">
+            <CardHeader className="pb-2">
+              <div className="h-5 w-24 bg-muted rounded"></div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-8 w-16 bg-muted rounded mb-1"></div>
+              <div className="h-4 w-32 bg-muted rounded"></div>
+            </CardContent>
+          </Card>
+        ))}
+      </>
+    )
+  }
+
   return (
     <>
       <Card>
@@ -48,7 +65,7 @@ export function AssetStats() {
           <Building className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{stats.totalAssets || stats.totalProperties}</div>
+          <div className="text-2xl font-bold">{stats.totalProperties}</div>
           <p className="text-xs text-muted-foreground">Propiedades registradas</p>
         </CardContent>
       </Card>

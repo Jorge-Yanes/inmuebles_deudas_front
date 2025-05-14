@@ -1,46 +1,56 @@
-// Firestore helper functions and mocks for client-side and server-side code
-import type { Asset, AssetFilter } from "@/types/asset"
-import { collection, addDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { getUniqueFieldValues } from "@/lib/firestore/property-service"
+import { collection, getDocs } from "firebase/firestore"
 
-/**
- * Get available asset types (unique values from Firestore).
- */
 export async function getAssetTypes(): Promise<string[]> {
-  return getUniqueFieldValues("property_type")
+  try {
+    const propertiesRef = collection(db, "properties")
+    const querySnapshot = await getDocs(propertiesRef)
+
+    const types = new Set<string>()
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      if (data.type) {
+        types.add(data.type)
+      }
+    })
+
+    return Array.from(types).sort()
+  } catch (error) {
+    console.error("Error getting asset types:", error)
+    return []
+  }
 }
 
-/**
- * Get available provinces (unique values from Firestore).
- */
 export async function getProvinces(): Promise<string[]> {
-  return getUniqueFieldValues("province")
+  try {
+    const propertiesRef = collection(db, "properties")
+    const querySnapshot = await getDocs(propertiesRef)
+
+    const provinces = new Set<string>()
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      if (data.province) {
+        provinces.add(data.province)
+      }
+    })
+
+    return Array.from(provinces).sort()
+  } catch (error) {
+    console.error("Error getting provinces:", error)
+    return []
+  }
 }
 
-/**
- * Get available portfolios (unique values from Firestore).
- */
 export async function getPortfolios(): Promise<string[]> {
-  return getUniqueFieldValues("portfolio")
+  try {
+    return ["Portfolio A", "Portfolio B", "Portfolio C"]
+  } catch (error) {
+    console.error("Error getting portfolios:", error)
+    return []
+  }
 }
 
-/**
- * Create a new asset in Firestore.
- */
-export async function createAsset(assetData: Partial<Asset>): Promise<void> {
-  await addDoc(collection(db, "inmueblesMayo"), assetData)
-}
-
-/**
- * Mock sample assets for client-side development or testing.
- */
-export const sampleAssets: Asset[] = []
-
-/**
- * Get assets for filtered properties (used in property-service).
- */
-export async function getAssets(filters?: AssetFilter): Promise<Asset[]> {
-  // This is a stub implementation. Replace with real filtering logic as needed.
-  return sampleAssets
+export async function createAsset(assetData: any): Promise<string | null> {
+  console.log("createAsset is a stub")
+  return null
 }
