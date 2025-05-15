@@ -115,7 +115,11 @@ export function SearchBar({
           }}
           onFocus={() => setShowSuggestions(true)}
           onKeyDown={handleKeyDown}
-          className={cn("pl-9 h-12 text-lg", query && "pr-9", variant === "default" ? "rounded-md" : "rounded-sm")}
+          className={cn(
+            "pl-9 h-20 text-xl w-full max-w-6xl",
+            query && "pr-9",
+            variant === "default" ? "rounded-md" : "rounded-sm",
+          )}
         />
         {query && (
           <Button

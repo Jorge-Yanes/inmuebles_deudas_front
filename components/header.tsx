@@ -14,7 +14,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { SearchBar } from "@/components/search-bar"
 import { useAuth } from "@/context/auth-context"
 
 export function Header() {
@@ -25,9 +24,6 @@ export function Header() {
   if (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password") {
     return null
   }
-
-  // Don't show search bar on search page
-  const showSearchBar = !pathname.startsWith("/search")
 
   // Check if we're in the admin section
   const isAdminSection = pathname.startsWith("/admin")
@@ -133,12 +129,6 @@ export function Header() {
           {isAdminSection ? "Panel de Administración" : "Portal Inmobiliario"}
         </span>
       </Link>
-
-      {!isAdminSection && showSearchBar && (
-        <div className="mx-auto hidden md:block">
-          <SearchBar variant="minimal" />
-        </div>
-      )}
 
       <div className="ml-auto flex items-center gap-2">
         {user ? (
