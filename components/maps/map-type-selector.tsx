@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useEffect, memo } from "react"
-import { useAuth } from "@/context/auth-context"
+import { memo } from "react"
 import { Button } from "@/components/ui/button"
 import { Map, FileText } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -20,28 +19,22 @@ export const MapTypeSelector = memo(function MapTypeSelector({
   currentType,
   hasCadastralData,
 }: MapTypeSelectorProps) {
-  const { user } = useAuth()
-  const [mounted, setMounted] = useState(false)
-
-  // Prevent hydration mismatch
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // Only render for admin users
-  if (!mounted || user?.role !== "admin") {
-    return null
-  }
-
   return (
     <TooltipProvider>
-      <div className="absolute top-2 right-2 z-10 flex gap-1 bg-background/80 p-1 rounded-md backdrop-blur-sm">
+      <div
+        className="absolute top-2 right-2 z-10 flex gap-1 bg-background/80 p-1 rounded-md backdrop-blur-sm"
+        data-testid="map-type-selector"
+      >
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant={currentType === "standard" ? "default" : "outline"}
               size="icon"
-              onClick={() => onChange("standard")}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onChange("standard")
+              }}
               className="h-8 w-8"
             >
               <Map className="h-4 w-4" />
@@ -58,7 +51,11 @@ export const MapTypeSelector = memo(function MapTypeSelector({
             <Button
               variant={currentType === "cadastral" ? "default" : "outline"}
               size="icon"
-              onClick={() => onChange("cadastral")}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onChange("cadastral")
+              }}
               className="h-8 w-8"
               disabled={!hasCadastralData}
             >

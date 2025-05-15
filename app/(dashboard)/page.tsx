@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AssetStats } from "@/components/asset-stats"
-import { RecentAssets } from "@/components/recent-assets"
 import { SearchBar } from "@/components/search-bar"
 import { DashboardGreeting } from "@/components/dashboard-greeting" // New component
+import { MostProfitableAssets } from "@/components/most-profitable-assets"
 
 export default function HomePage() {
   return (
@@ -18,14 +18,14 @@ export default function HomePage() {
         <p className="text-muted-foreground">Gestione sus activos inmobiliarios de manera eficiente</p>
       </div>
 
-      <div className="mx-auto w-full max-w-2xl">
-        <SearchBar placeholder="Buscar por ubicación, tipo, precio..." />
-      </div>
-
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Suspense fallback={<Skeleton className="h-[120px] w-full" />}>
           <AssetStats />
         </Suspense>
+      </div>
+
+      <div className="mx-auto w-full">
+        <SearchBar placeholder="Buscar por ubicación, tipo, precio..." />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
@@ -65,9 +65,9 @@ export default function HomePage() {
       </div>
 
       <div>
-        <h2 className="mb-4 text-2xl font-semibold tracking-tight">Activos Recientes</h2>
+        <h2 className="mb-4 text-2xl font-semibold tracking-tight">Top Activos Más Rentables</h2>
         <Suspense fallback={<Skeleton className="h-[200px] w-full" />}>
-          <RecentAssets />
+          <MostProfitableAssets />
         </Suspense>
       </div>
     </div>

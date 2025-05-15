@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Building, Home, Search, Settings } from "lucide-react"
+import { Building, Home, Search, Settings } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 
 export function ClientSidebar() {
@@ -21,10 +21,6 @@ export function ClientSidebar() {
   return (
     <aside className="hidden w-64 flex-shrink-0 border-r bg-background lg:block">
       <div className="flex h-full flex-col gap-2 p-4">
-        <div className="flex h-14 items-center border-b px-4 py-2">
-          <h2 className="text-lg font-semibold">Portal Inmobiliario</h2>
-        </div>
-
         <nav className="grid gap-1 px-2 pt-2">
           <Link
             href="/"
@@ -55,20 +51,6 @@ export function ClientSidebar() {
             <Search className="h-4 w-4" />
             Búsqueda Avanzada
           </Link>
-
-          {checkPermission("viewFinancialData") && (
-            <Link
-              href="/analytics"
-              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium ${
-                isActive("/analytics")
-                  ? "bg-accent text-accent-foreground"
-                  : "hover:bg-accent hover:text-accent-foreground"
-              }`}
-            >
-              <BarChart3 className="h-4 w-4" />
-              Análisis
-            </Link>
-          )}
 
           <Link
             href="/settings"

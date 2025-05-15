@@ -99,7 +99,10 @@ export function SearchBar({
   }
 
   return (
-    <div ref={searchRef} className={cn("relative", variant === "default" ? "w-full max-w-md" : "w-full", className)}>
+    <div
+      ref={searchRef}
+      className={cn("relative mx-auto", variant === "default" ? "w-full max-w-2xl" : "w-full", className)}
+    >
       <div className="relative flex items-center">
         <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
         <Input
@@ -112,7 +115,7 @@ export function SearchBar({
           }}
           onFocus={() => setShowSuggestions(true)}
           onKeyDown={handleKeyDown}
-          className={cn("pl-9", query && "pr-9", variant === "default" ? "rounded-full" : "rounded-md")}
+          className={cn("pl-9 h-12 text-lg", query && "pr-9", variant === "default" ? "rounded-md" : "rounded-sm")}
         />
         {query && (
           <Button
