@@ -14,46 +14,53 @@ import {
 import { db } from "@/lib/firebase"
 import type { Asset, AssetFilter } from "@/types/asset"
 import type { User } from "@/types/user"
-import { normalizeText } from "@/lib/utils"
+import { normalizeText, getFullAddress } from "@/lib/utils"
 
-// Cache for property data to improve performance
+// Cache para mejorar el rendimiento
 const propertyCache = new Map<string, Asset>()
-const CACHE_EXPIRY = 5 * 60 * 1000 // 5 minutes
+const CACHE_EXPIRY = 5 * 60 * 1000 // 5 minutos
 
-// Convert Firestore timestamp to Date
-const convertTimestamp = (timestamp: Timestamp | undefined): Date | undefined => {
+// Convertir timestamp de Firestore a Date
+const convertTimestamp = (timestamp: Timestamp | undefined | null): Date | undefined => {
   return timestamp ? timestamp.toDate() : undefined
 }
 
-// Convert Firestore document to Asset type
+// Convertir string a Date si es posible
+const parseDate = (dateStr: string | undefined | null): Date | undefined => {
+  if (!dateStr) return undefined
+
+  // Intentar parsear la fecha
+  const date = new Date(dateStr)
+  return isNaN(date.getTime()) ? undefined : date
+}
+
+// Convertir documento de Firestore a tipo Asset
 export const convertDocToAsset = (doc: DocumentData): Asset => {
   const data = doc.data()
 
-  // Handle potential data inconsistencies
+  // Manejar posibles inconsistencias de datos
   const asset: Asset = {
     id: doc.id,
     ndg: data.ndg || "",
     lien: data.lien || undefined,
     property_id: data.property_id || undefined,
-    reference_code: data.reference_code || "",
+    reference_code: data.reference_code || undefined,
     parcel: data.parcel || undefined,
     cadastral_reference: data.cadastral_reference || undefined,
     property_idh: data.property_idh || undefined,
     property_bank_id: data.property_bank_id || undefined,
     alt_id1: data.alt_id1 || undefined,
-    idufir: data.idufir || undefined,
+    idufir: data.IDUFIR || data.idufir || undefined,
     id_portal_subasta: data.id_portal_subasta || undefined,
 
-    // Property information
-    property_type: data.property_type || "OTHER",
-    property_general_subtype: data.property_general_subtype || undefined,
-    title: data.title || undefined,
-    description: data.description || undefined,
+    // Información de la propiedad
+    property_type: data.property_type || data["Property Type"] || "OTHER",
+    property_general_subtype: data.property_general_subtype || data["Property General Subtype"] || undefined,
 
-    // Location
+    // Ubicación
     province: data.province || "",
     city: data.city || "",
-    address: data.address || "",
+    address: data.address || undefined,
     numero: data.numero || undefined,
     street_type: data.street_type || undefined,
     street_no: data.street_no || undefined,
@@ -62,51 +69,75 @@ export const convertDocToAsset = (doc: DocumentData): Asset => {
     door: data.door || undefined,
     comarca: data.comarca || undefined,
 
-    // Physical characteristics
-    sqm: data.sqm || 0,
+    // Información catastral
+    direccion_texto_catastro: data.direccion_texto_catastro || undefined,
+    provincia_catastro: data.provincia_catastro || undefined,
+    municipio_catastro: data.municipio_catastro || undefined,
+    tipo_via_catastro: data.tipo_via_catastro || undefined,
+    nombre_via_catastro: data.nombre_via_catastro || undefined,
+    numero_portal_catastro: data.numero_portal_catastro || undefined,
+    escalera_catastro: data.escalera_catastro || undefined,
+    planta_catastro: data.planta_catastro || undefined,
+    puerta_catastro: data.puerta_catastro || undefined,
+    codigo_postal_catastro: data.codigo_postal_catastro || undefined,
+    superficie_construida_m2: data.superficie_construida_m2 || undefined,
+    uso_predominante_inmueble: data.uso_predominante_inmueble || undefined,
+    ano_construccion_inmueble: data.ano_construccion_inmueble || undefined,
+
+    // Características físicas
+    sqm: Number.parseFloat(data.sqm) || Number.parseFloat(data.superficie_construida_m2) || 0,
     rooms: data.rooms || undefined,
     bathrooms: data.bathrooms || undefined,
     has_parking: data.has_parking || undefined,
     extras: data.extras || undefined,
 
-    // Financial information
-    gbv: data.gbv || undefined,
-    auction_base: data.auction_base || undefined,
-    deuda: data.deuda || undefined,
-    auction_value: data.auction_value || undefined,
-    price_approx: data.price_approx || undefined,
-    price_to_brokers: data.price_to_brokers || undefined,
-    ob: data.ob || undefined,
+    // Información financiera
+    gbv: Number.parseFloat(data.gbv) || undefined,
+    auction_base: Number.parseFloat(data.auction_base) || undefined,
+    deuda: Number.parseFloat(data.deuda) || undefined,
+    DEUDA: Number.parseFloat(data.DEUDA) || undefined,
+    auction_value: Number.parseFloat(data.auction_value) || undefined,
+    price_approx: Number.parseFloat(data.price_approx) || undefined,
+    price_to_brokers: Number.parseFloat(data.price_to_brokers) || undefined,
+    ob: Number.parseFloat(data.ob) || undefined,
+    hv: Number.parseFloat(data.hv) || undefined,
+    purchase_price: Number.parseFloat(data.purchase_price) || undefined,
+    uw_value: Number.parseFloat(data.uw_value) || undefined,
+    hipoges_value_total: Number.parseFloat(data.hipoges_value_total) || undefined,
 
-    // Legal information
+    // Información de mercado
+    precio_idealista_venta_m2: Number.parseFloat(data.precio_idealista_venta_m2) || undefined,
+    precio_idealista_alquiler_m2: Number.parseFloat(data.precio_idealista_alquiler_m2) || undefined,
+
+    // Información legal
     legal_type: data.legal_type || undefined,
     legal_phase: data.legal_phase || undefined,
     tipo_procedimiento: data.tipo_procedimiento || undefined,
     fase_procedimiento: data.fase_procedimiento || undefined,
     fase_actual: data.fase_actual || undefined,
 
-    // Status
+    // Estados
     registration_status: data.registration_status || undefined,
     working_status: data.working_status || undefined,
     marketing_status: data.marketing_status || undefined,
     marketing_suspended_reason: data.marketing_suspended_reason || undefined,
     estado_posesion_fisica: data.estado_posesion_fisica || undefined,
 
-    // Dates
-    closing_date: convertTimestamp(data.closing_date),
-    portfolio_closing_date: convertTimestamp(data.portfolio_closing_date),
-    date_under_re_mgmt: convertTimestamp(data.date_under_re_mgmt),
-    fecha_subasta: convertTimestamp(data.fecha_subasta),
-    fecha_cesion_remate: convertTimestamp(data.fecha_cesion_remate),
+    // Fechas
+    closing_date: convertTimestamp(data.closing_date) || parseDate(data.closing_date),
+    portfolio_closing_date: convertTimestamp(data.portfolio_closing_date) || parseDate(data.portfolio_closing_date),
+    date_under_re_mgmt: convertTimestamp(data.date_under_re_mgmt) || parseDate(data.date_under_re_mgmt),
+    fecha_subasta: convertTimestamp(data.fecha_subasta) || parseDate(data.fecha_subasta),
+    fecha_cesion_remate: convertTimestamp(data.fecha_cesion_remate) || parseDate(data.fecha_cesion_remate),
 
-    // Additional information
+    // Información adicional
     campania: data.campania || undefined,
     portfolio: data.portfolio || undefined,
     borrower_name: data.borrower_name || undefined,
     hip_under_re_mgmt: data.hip_under_re_mgmt || undefined,
     reference_code_1: data.reference_code_1 || undefined,
 
-    // UI fields
+    // Campos para UI
     imageUrl: data.imageUrl || undefined,
     features: data.features || [],
     documents: data.documents || [],
@@ -114,18 +145,127 @@ export const convertDocToAsset = (doc: DocumentData): Asset => {
     createdAt: convertTimestamp(data.createdAt) || new Date(),
   }
 
+  // Generar título y descripción si no existen
+  if (!asset.title) {
+    asset.title = generateTitle(asset)
+  }
+
+  if (!asset.description) {
+    asset.description = generateDescription(asset)
+  }
+
   return asset
 }
 
-// Get a single property by ID
+// Función auxiliar para generar título
+function generateTitle(asset: Asset): string {
+  const propertyTypeLabels: Record<string, string> = {
+    RESIDENTIAL: "Residencial",
+    COMMERCIAL: "Comercial",
+    INDUSTRIAL: "Industrial",
+    LAND: "Terreno",
+    PARKING: "Garaje",
+    STORAGE: "Trastero",
+    OTHER: "Otro",
+    Vivienda: "Vivienda",
+    "Local Comercial": "Local Comercial",
+    Garaje: "Garaje",
+    Trastero: "Trastero",
+    "Nave Industrial": "Nave Industrial",
+    Suelo: "Suelo",
+    Edificio: "Edificio",
+    Oficina: "Oficina",
+    Otros: "Otros",
+  }
+
+  const type = propertyTypeLabels[asset.property_type] || asset.property_type
+  const location = asset.city || asset.province || asset.municipio_catastro || asset.provincia_catastro
+  const size = asset.sqm
+    ? `${asset.sqm}m²`
+    : asset.superficie_construida_m2
+      ? `${asset.superficie_construida_m2}m²`
+      : ""
+
+  let title = `${type} en ${location}`
+  if (size) title += ` de ${size}`
+  if (asset.rooms) title += `, ${asset.rooms} hab.`
+
+  return title
+}
+
+// Función auxiliar para generar descripción
+function generateDescription(asset: Asset): string {
+  const propertyTypeLabels: Record<string, string> = {
+    RESIDENTIAL: "Residencial",
+    COMMERCIAL: "Comercial",
+    INDUSTRIAL: "Industrial",
+    LAND: "Terreno",
+    PARKING: "Garaje",
+    STORAGE: "Trastero",
+    OTHER: "Otro",
+    Vivienda: "Vivienda",
+    "Local Comercial": "Local Comercial",
+    Garaje: "Garaje",
+    Trastero: "Trastero",
+    "Nave Industrial": "Nave Industrial",
+    Suelo: "Suelo",
+    Edificio: "Edificio",
+    Oficina: "Oficina",
+    Otros: "Otros",
+  }
+
+  const legalPhaseLabels: Record<string, string> = {
+    FORECLOSURE: "Ejecución Hipotecaria",
+    AUCTION: "Subasta",
+    ADJUDICATION: "Adjudicación",
+    POSSESSION: "Posesión",
+    EVICTION: "Desahucio",
+    CLOSED: "Cerrado",
+    Foreclosure: "Ejecución Hipotecaria",
+    Auction: "Subasta",
+    Adjudication: "Adjudicación",
+    Possession: "Posesión",
+    Eviction: "Desahucio",
+    Closed: "Cerrado",
+  }
+
+  const type = propertyTypeLabels[asset.property_type] || asset.property_type
+
+  // Obtener dirección completa
+  const address = getFullAddress(asset)
+  const city = asset.city || asset.municipio_catastro || "ciudad no disponible"
+  const province = asset.province || asset.provincia_catastro || "provincia no disponible"
+
+  let description = `${type} ubicado en ${address}, ${city}, ${province}.`
+
+  if (asset.sqm) description += ` Superficie de ${asset.sqm}m².`
+  else if (asset.superficie_construida_m2)
+    description += ` Superficie construida de ${asset.superficie_construida_m2}m².`
+
+  if (asset.rooms) description += ` ${asset.rooms} habitaciones.`
+  if (asset.bathrooms) description += ` ${asset.bathrooms} baños.`
+  if (asset.extras) description += ` ${asset.extras}.`
+  if (asset.ano_construccion_inmueble && asset.ano_construccion_inmueble !== "0") {
+    description += ` Año de construcción: ${asset.ano_construccion_inmueble}.`
+  }
+
+  if (asset.legal_phase) {
+    const phase = legalPhaseLabels[asset.legal_phase] || asset.legal_phase
+    description += ` Actualmente en fase legal: ${phase}.`
+  }
+
+  return description
+}
+
+// Obtener una propiedad por ID
 export async function getPropertyById(id: string, user?: User | null): Promise<Asset | null> {
   try {
-    // Check cache first
+    // Verificar caché primero
     if (propertyCache.has(id)) {
       const cachedData = propertyCache.get(id)!
       const cacheTime = cachedData.cacheTime as unknown as number
 
-      // Return cached data if it's still valid
+      // Devolver datos en caché si aún son válidos
       if (cacheTime && Date.now() - cacheTime < CACHE_EXPIRY) {
         return cachedData
       }
@@ -139,7 +279,7 @@ export async function getPropertyById(id: string, user?: User | null): Promise<A
 
     const asset = convertDocToAsset(propertyDoc)
 
-    // Add to cache with timestamp
+    // Añadir a caché con timestamp
     const assetWithCache = {
       ...asset,
       cacheTime: Date.now(),
@@ -153,11 +293,11 @@ export async function getPropertyById(id: string, user?: User | null): Promise<A
   }
 }
 
-// Get all properties without any filtering or sorting - avoids index requirements
-export async function getAllProperties(limit = 500): Promise<Asset[]> {
+// Obtener todas las propiedades sin filtrado ni ordenación
+export async function getAllProperties(maxLimit = 500): Promise<Asset[]> {
   try {
-    // Simple query with just a limit - no filtering or sorting
-    const propertiesQuery = query(collection(db, "inmueblesMayo"), limit)
+    // Consulta simple con solo un límite - sin filtrado ni ordenación
+    const propertiesQuery = query(collection(db, "inmueblesMayo"), limit(maxLimit))
     const querySnapshot = await getDocs(propertiesQuery)
 
     const properties: Asset[] = []
@@ -174,7 +314,7 @@ export async function getAllProperties(limit = 500): Promise<Asset[]> {
   }
 }
 
-// Get properties with pagination and filtering - Modified to completely avoid composite indexes
+// Obtener propiedades con paginación y filtrado
 export async function getProperties(
   filters?: AssetFilter,
   pageSize = 10,
@@ -184,14 +324,14 @@ export async function getProperties(
   try {
     console.log("Property service: Getting properties with filters:", filters)
 
-    // To avoid requiring composite indexes, we'll use different strategies:
+    // Para evitar requerir índices compuestos, usaremos diferentes estrategias:
 
-    // 1. If no filters are applied, we can use orderBy safely
+    // 1. Si no se aplican filtros, podemos usar orderBy de forma segura
     if (!filters || Object.values(filters).every((v) => !v || v === "ALL")) {
-      // No filters, just sort by createdAt
+      // Sin filtros, solo ordenar por createdAt
       const simpleQuery = query(collection(db, "inmueblesMayo"), orderBy("createdAt", "desc"), limit(pageSize))
 
-      // Apply pagination for non-filtered queries
+      // Aplicar paginación para consultas sin filtros
       if (lastVisible) {
         const paginatedQuery = query(
           collection(db, "inmueblesMayo"),
@@ -224,18 +364,18 @@ export async function getProperties(
       return { properties, lastVisible: newLastVisible }
     }
 
-    // 2. For filtered queries, we'll fetch all properties and filter client-side
-    // This is less efficient but avoids index requirements
-    const allProperties = await getAllProperties(500) // Limit to 500 to avoid excessive reads
+    // 2. Para consultas filtradas, obtendremos todas las propiedades y filtraremos del lado del cliente
+    // Esto es menos eficiente pero evita requisitos de índice
+    const allProperties = await getAllProperties(500) // Límite a 500 para evitar lecturas excesivas
 
-    // Apply filters client-side
+    // Aplicar filtros del lado del cliente
     let filteredProperties = allProperties
 
     if (filters) {
       filteredProperties = allProperties.filter((asset) => {
         let include = true
 
-        // Apply all filters
+        // Aplicar todos los filtros
         if (filters.property_type && filters.property_type !== "ALL" && asset.property_type !== filters.property_type) {
           include = false
         }
@@ -266,7 +406,11 @@ export async function getProperties(
           include = false
         }
 
-        // Apply numeric range filters
+        if (include && filters.comarca && filters.comarca !== "ALL" && asset.comarca !== filters.comarca) {
+          include = false
+        }
+
+        // Aplicar filtros de rango numérico
         if (include && filters.minPrice && asset.price_approx && asset.price_approx < filters.minPrice) {
           include = false
         }
@@ -283,21 +427,70 @@ export async function getProperties(
           include = false
         }
 
+        // Nuevos filtros
+        if (
+          include &&
+          filters.ano_construccion_min &&
+          asset.ano_construccion_inmueble &&
+          Number.parseInt(asset.ano_construccion_inmueble) < Number.parseInt(filters.ano_construccion_min)
+        ) {
+          include = false
+        }
+
+        if (
+          include &&
+          filters.ano_construccion_max &&
+          asset.ano_construccion_inmueble &&
+          Number.parseInt(asset.ano_construccion_inmueble) > Number.parseInt(filters.ano_construccion_max)
+        ) {
+          include = false
+        }
+
+        if (
+          include &&
+          filters.precio_idealista_min &&
+          asset.precio_idealista_venta_m2 &&
+          asset.precio_idealista_venta_m2 < filters.precio_idealista_min
+        ) {
+          include = false
+        }
+
+        if (
+          include &&
+          filters.precio_idealista_max &&
+          asset.precio_idealista_venta_m2 &&
+          asset.precio_idealista_venta_m2 > filters.precio_idealista_max
+        ) {
+          include = false
+        }
+
+        if (include && filters.has_parking && asset.has_parking !== filters.has_parking) {
+          include = false
+        }
+
+        if (include && filters.rooms && asset.rooms !== filters.rooms) {
+          include = false
+        }
+
+        if (include && filters.bathrooms && asset.bathrooms !== filters.bathrooms) {
+          include = false
+        }
+
         return include
       })
     }
 
-    // Sort by createdAt manually
+    // Ordenar por createdAt manualmente
     filteredProperties.sort((a, b) => {
       const dateA = a.createdAt?.getTime() || 0
       const dateB = b.createdAt?.getTime() || 0
-      return dateB - dateA // Descending order (newest first)
+      return dateB - dateA // Orden descendente (más reciente primero)
     })
 
-    // Handle pagination manually
+    // Manejar paginación manualmente
     let startIndex = 0
     if (lastVisible) {
-      // Find the index of the last visible item
+      // Encontrar el índice del último elemento visible
       const lastId = lastVisible.id
       const lastIndex = filteredProperties.findIndex((asset) => asset.id === lastId)
       if (lastIndex !== -1) {
@@ -305,15 +498,15 @@ export async function getProperties(
       }
     }
 
-    // Get the current page of results
+    // Obtener la página actual de resultados
     const endIndex = startIndex + pageSize
     const pagedProperties = filteredProperties.slice(startIndex, endIndex)
 
-    // Set the last visible doc for pagination
+    // Establecer el último documento visible para paginación
     let newLastVisible: QueryDocumentSnapshot<DocumentData> | null = null
     if (pagedProperties.length > 0) {
       const lastId = pagedProperties[pagedProperties.length - 1].id
-      // This is a mock last visible document since we're not using Firestore's pagination
+      // Este es un documento visible simulado ya que no estamos usando la paginación de Firestore
       newLastVisible = { id: lastId } as QueryDocumentSnapshot<DocumentData>
     }
 
@@ -327,7 +520,7 @@ export async function getProperties(
   }
 }
 
-// Get unique values for filters
+// Obtener valores únicos para filtros
 export async function getUniqueFieldValues(field: string): Promise<string[]> {
   try {
     const querySnapshot = await getDocs(collection(db, "inmueblesMayo"))
@@ -347,7 +540,7 @@ export async function getUniqueFieldValues(field: string): Promise<string[]> {
   }
 }
 
-// Get property statistics
+// Obtener estadísticas de propiedades
 export async function getPropertyStats(userId?: string): Promise<{
   totalProperties: number
   totalValue: number
@@ -393,30 +586,35 @@ export async function getPropertyStats(userId?: string): Promise<{
   }
 }
 
-// Search properties by text query - client-side approach
+// Buscar propiedades por consulta de texto - enfoque del lado del cliente
 export async function searchProperties(query: string): Promise<Asset[]> {
   try {
     if (!query.trim()) {
       return []
     }
 
-    // Get all properties and filter client-side
+    // Obtener todas las propiedades y filtrar del lado del cliente
     const allProperties = await getAllProperties(500)
     const normalizedQuery = normalizeText(query.toLowerCase())
 
-    // Filter by the search query
+    // Filtrar por la consulta de búsqueda
     const results = allProperties.filter((asset) => {
-      // Search across multiple fields
+      // Buscar en múltiples campos
       const searchableFields = [
         asset.reference_code,
         asset.address,
+        asset.direccion_texto_catastro,
         asset.city,
+        asset.municipio_catastro,
         asset.province,
+        asset.provincia_catastro,
         asset.property_type,
         asset.property_general_subtype,
         asset.marketing_status,
         asset.legal_phase,
         asset.extras,
+        asset.uso_predominante_inmueble,
+        asset.comarca,
       ]
         .filter(Boolean)
         .map((field) => normalizeText(field || ""))
@@ -431,24 +629,32 @@ export async function searchProperties(query: string): Promise<Asset[]> {
   }
 }
 
-// Get filtered properties - client-side approach
+// Obtener propiedades filtradas - enfoque del lado del cliente
 export async function getFilteredProperties(filters: Record<string, string | undefined>): Promise<Asset[]> {
   try {
-    // Convert the filters to the AssetFilter type
+    // Convertir los filtros al tipo AssetFilter
     const assetFilters: AssetFilter = {
       property_type: filters.property_type,
       marketing_status: filters.marketing_status,
       legal_phase: filters.legal_phase,
       province: filters.province,
       city: filters.city,
+      comarca: filters.comarca,
       minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
       maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
       minSqm: filters.minSqm ? Number(filters.minSqm) : undefined,
       maxSqm: filters.maxSqm ? Number(filters.maxSqm) : undefined,
       query: filters.query,
+      ano_construccion_min: filters.ano_construccion_min,
+      ano_construccion_max: filters.ano_construccion_max,
+      precio_idealista_min: filters.precio_idealista_min ? Number(filters.precio_idealista_min) : undefined,
+      precio_idealista_max: filters.precio_idealista_max ? Number(filters.precio_idealista_max) : undefined,
+      has_parking: filters.has_parking,
+      rooms: filters.rooms,
+      bathrooms: filters.bathrooms,
     }
 
-    // Use the getProperties function to get filtered properties
+    // Usar la función getProperties para obtener propiedades filtradas
     const result = await getProperties(assetFilters, 100)
     return result.properties
   } catch (error) {
@@ -457,20 +663,25 @@ export async function getFilteredProperties(filters: Record<string, string | und
   }
 }
 
-// Get provinces
+// Obtener provincias
 export async function getProvinces(): Promise<string[]> {
   return getUniqueFieldValues("province")
 }
 
-// Get cities
+// Obtener comarcas
+export async function getComarcas(): Promise<string[]> {
+  return getUniqueFieldValues("comarca")
+}
+
+// Obtener ciudades
 export async function getCities(province?: string): Promise<string[]> {
   try {
-    // If no province is specified, just get all unique cities
+    // Si no se especifica provincia, simplemente obtener todas las ciudades únicas
     if (!province || province === "ALL") {
       return getUniqueFieldValues("city")
     }
 
-    // Otherwise, get all properties and filter client-side
+    // De lo contrario, obtener todas las propiedades y filtrar del lado del cliente
     const allProperties = await getAllProperties(500)
     const cities = new Set<string>()
 
@@ -487,17 +698,32 @@ export async function getCities(province?: string): Promise<string[]> {
   }
 }
 
-// Get property types
+// Obtener tipos de propiedad
 export async function getPropertyTypes(): Promise<string[]> {
   return getUniqueFieldValues("property_type")
 }
 
-// Get marketing statuses
+// Obtener estados de marketing
 export async function getMarketingStatuses(): Promise<string[]> {
   return getUniqueFieldValues("marketing_status")
 }
 
-// Get legal phases
+// Obtener fases legales
 export async function getLegalPhases(): Promise<string[]> {
   return getUniqueFieldValues("legal_phase")
+}
+
+// Obtener años de construcción únicos
+export async function getConstructionYears(): Promise<string[]> {
+  return getUniqueFieldValues("ano_construccion_inmueble")
+}
+
+// Obtener número de habitaciones únicas
+export async function getRoomCounts(): Promise<string[]> {
+  return getUniqueFieldValues("rooms")
+}
+
+// Obtener número de baños únicos
+export async function getBathroomCounts(): Promise<string[]> {
+  return getUniqueFieldValues("bathrooms")
 }

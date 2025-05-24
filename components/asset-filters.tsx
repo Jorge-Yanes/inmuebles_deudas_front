@@ -14,6 +14,10 @@ import {
   getLegalPhases,
   getProvinces,
   getCities,
+  getComarcas,
+  getConstructionYears,
+  getRoomCounts,
+  getBathroomCounts,
 } from "@/lib/firestore/property-service"
 import { propertyTypeLabels, marketingStatusLabels, legalPhaseLabels } from "@/types/asset"
 
@@ -22,48 +26,70 @@ export function AssetFilters() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  // State for filter options
+  // Estado para opciones de filtro
   const [propertyTypes, setPropertyTypes] = useState<string[]>([])
   const [marketingStatuses, setMarketingStatuses] = useState<string[]>([])
   const [legalPhases, setLegalPhases] = useState<string[]>([])
   const [provinces, setProvinces] = useState<string[]>([])
   const [cities, setCities] = useState<string[]>([])
+  const [comarcas, setComarcas] = useState<string[]>([])
+  const [constructionYears, setConstructionYears] = useState<string[]>([])
+  const [roomCounts, setRoomCounts] = useState<string[]>([])
+  const [bathroomCounts, setBathroomCounts] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
-  // State for current filter values
+  // Estado para valores de filtro actuales
   const [filters, setFilters] = useState({
     property_type: searchParams.get("property_type") || "",
     marketing_status: searchParams.get("marketing_status") || "",
     legal_phase: searchParams.get("legal_phase") || "",
     province: searchParams.get("province") || "",
     city: searchParams.get("city") || "",
+    comarca: searchParams.get("comarca") || "",
     minPrice: searchParams.get("minPrice") || "",
     maxPrice: searchParams.get("maxPrice") || "",
     minSqm: searchParams.get("minSqm") || "",
     maxSqm: searchParams.get("maxSqm") || "",
     query: searchParams.get("query") || "",
+    ano_construccion_min: searchParams.get("ano_construccion_min") || "",
+    ano_construccion_max: searchParams.get("ano_construccion_max") || "",
+    precio_idealista_min: searchParams.get("precio_idealista_min") || "",
+    precio_idealista_max: searchParams.get("precio_idealista_max") || "",
+    rooms: searchParams.get("rooms") || "",
+    bathrooms: searchParams.get("bathrooms") || "",
+    has_parking: searchParams.get("has_parking") || "",
   })
 
-  // Fetch filter options
+  // Obtener opciones de filtro
   useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
         setLoading(true)
 
-        // Fetch all filter options in parallel
-        const [types, statuses, phases, provs] = await Promise.all([
+        // Obtener todas las opciones de filtro en paralelo
+        const [types, statuses, phases, provs, coms, years, rooms, baths] = await Promise.all([
           getPropertyTypes(),
           getMarketingStatuses(),
           getLegalPhases(),
           getProvinces(),
+          getComarcas(),
+          getConstructionYears(),
+          getRoomCounts(),
+          getBathroomCounts(),
         ])
 
         setPropertyTypes(types)
         setMarketingStatuses(statuses)
         setLegalPhases(phases)
         setProvinces(provs)
+        setComarcas(coms)
+        setConstructionYears(
+          years.filter((year) => year !== "0").sort((a, b) => Number.parseInt(a) - Number.parseInt(b)),
+        )
+        setRoomCounts(rooms.sort((a, b) => Number.parseInt(a) - Number.parseInt(b)))
+        setBathroomCounts(baths.sort((a, b) => Number.parseInt(a) - Number.parseInt(b)))
 
-        // If province is selected, fetch cities for that province
+        // Si se selecciona una provincia, obtener ciudades para esa provincia
         if (filters.province) {
           const citiesData = await getCities(filters.province)
           setCities(citiesData)
@@ -78,7 +104,7 @@ export function AssetFilters() {
     fetchFilterOptions()
   }, [filters.province])
 
-  // Update cities when province changes
+  // Actualizar ciudades cuando cambia la provincia
   useEffect(() => {
     const updateCities = async () => {
       if (filters.province) {
@@ -86,7 +112,7 @@ export function AssetFilters() {
           const citiesData = await getCities(filters.province)
           setCities(citiesData)
 
-          // If the current city is not in the new list of cities, reset it
+          // Si la ciudad actual no está en la nueva lista de ciudades, restablecerla
           if (filters.city && !citiesData.includes(filters.city)) {
             setFilters((prev) => ({ ...prev, city: "" }))
           }
@@ -104,9 +130,9 @@ export function AssetFilters() {
     updateCities()
   }, [filters.province])
 
-  // Handle filter changes
+  // Manejar cambios de filtro
   const handleFilterChange = (name: string, value: string) => {
-    // Special handling for province changes
+    // Manejo especial para cambios de provincia
     if (name === "province" && value !== filters.province) {
       setFilters((prev) => ({ ...prev, [name]: value, city: "" }))
     } else {
@@ -114,11 +140,11 @@ export function AssetFilters() {
     }
   }
 
-  // Apply filters
+  // Aplicar filtros
   const applyFilters = () => {
     const params = new URLSearchParams()
 
-    // Only add non-empty filters to the URL
+    // Solo agregar filtros no vacíos a la URL
     Object.entries(filters).forEach(([key, value]) => {
       if (value) {
         params.set(key, value)
@@ -128,7 +154,7 @@ export function AssetFilters() {
     router.push(`${pathname}?${params.toString()}`)
   }
 
-  // Reset filters
+  // Restablecer filtros
   const resetFilters = () => {
     setFilters({
       property_type: "",
@@ -136,17 +162,25 @@ export function AssetFilters() {
       legal_phase: "",
       province: "",
       city: "",
+      comarca: "",
       minPrice: "",
       maxPrice: "",
       minSqm: "",
       maxSqm: "",
       query: "",
+      ano_construccion_min: "",
+      ano_construccion_max: "",
+      precio_idealista_min: "",
+      precio_idealista_max: "",
+      rooms: "",
+      bathrooms: "",
+      has_parking: "",
     })
 
     router.push(pathname)
   }
 
-  // Check if any filters are applied
+  // Verificar si se aplican filtros
   const hasActiveFilters = Object.values(filters).some((value) => value !== "")
 
   if (loading) {
@@ -262,6 +296,23 @@ export function AssetFilters() {
         )}
 
         <div className="space-y-2">
+          <Label htmlFor="comarca">Comarca</Label>
+          <Select value={filters.comarca} onValueChange={(value) => handleFilterChange("comarca", value)}>
+            <SelectTrigger id="comarca">
+              <SelectValue placeholder="Todas las comarcas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las comarcas</SelectItem>
+              {comarcas.map((comarca) => (
+                <SelectItem key={comarca} value={comarca}>
+                  {comarca}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="minPrice">Precio Mínimo</Label>
           <Input
             id="minPrice"
@@ -302,6 +353,116 @@ export function AssetFilters() {
             placeholder="Máximo"
             value={filters.maxSqm}
             onChange={(e) => handleFilterChange("maxSqm", e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="rooms">Habitaciones</Label>
+          <Select value={filters.rooms} onValueChange={(value) => handleFilterChange("rooms", value)}>
+            <SelectTrigger id="rooms">
+              <SelectValue placeholder="Cualquier número" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Cualquier número</SelectItem>
+              {roomCounts.map((count) => (
+                <SelectItem key={count} value={count}>
+                  {count}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="bathrooms">Baños</Label>
+          <Select value={filters.bathrooms} onValueChange={(value) => handleFilterChange("bathrooms", value)}>
+            <SelectTrigger id="bathrooms">
+              <SelectValue placeholder="Cualquier número" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Cualquier número</SelectItem>
+              {bathroomCounts.map((count) => (
+                <SelectItem key={count} value={count}>
+                  {count}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="has_parking">Plaza de Garaje</Label>
+          <Select value={filters.has_parking} onValueChange={(value) => handleFilterChange("has_parking", value)}>
+            <SelectTrigger id="has_parking">
+              <SelectValue placeholder="Cualquier opción" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Cualquier opción</SelectItem>
+              <SelectItem value="1">Sí</SelectItem>
+              <SelectItem value="0">No</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="ano_construccion_min">Año Construcción Mínimo</Label>
+          <Select
+            value={filters.ano_construccion_min}
+            onValueChange={(value) => handleFilterChange("ano_construccion_min", value)}
+          >
+            <SelectTrigger id="ano_construccion_min">
+              <SelectValue placeholder="Cualquier año" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Cualquier año</SelectItem>
+              {constructionYears.map((year) => (
+                <SelectItem key={year} value={year}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="ano_construccion_max">Año Construcción Máximo</Label>
+          <Select
+            value={filters.ano_construccion_max}
+            onValueChange={(value) => handleFilterChange("ano_construccion_max", value)}
+          >
+            <SelectTrigger id="ano_construccion_max">
+              <SelectValue placeholder="Cualquier año" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Cualquier año</SelectItem>
+              {constructionYears.map((year) => (
+                <SelectItem key={year} value={year}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="precio_idealista_min">Precio Idealista Mín. (€/m²)</Label>
+          <Input
+            id="precio_idealista_min"
+            type="number"
+            placeholder="Mínimo"
+            value={filters.precio_idealista_min}
+            onChange={(e) => handleFilterChange("precio_idealista_min", e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="precio_idealista_max">Precio Idealista Máx. (€/m²)</Label>
+          <Input
+            id="precio_idealista_max"
+            type="number"
+            placeholder="Máximo"
+            value={filters.precio_idealista_max}
+            onChange={(e) => handleFilterChange("precio_idealista_max", e.target.value)}
           />
         </div>
 
