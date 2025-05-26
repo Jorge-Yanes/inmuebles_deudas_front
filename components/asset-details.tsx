@@ -203,7 +203,8 @@ export function AssetDetails({ id }: AssetDetailsProps) {
 
             <TabsContent value="description" className="mt-4">
               <p>
-                {asset.description ||
+                {asset.descripcion ||
+                  asset.description ||
                   `${propertyType} ubicado en ${fullAddress}, ${asset.municipio_catastro}, ${asset.provincia_catastro}. Superficie construida de ${superficie}m².`}
               </p>
               <ConditionalField fieldName="extras">
@@ -880,7 +881,9 @@ export function AssetDetails({ id }: AssetDetailsProps) {
                         <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
                           <div className="flex items-center gap-2 mb-2">
                             <Calculator className="h-4 w-4 text-purple-600" />
-                            <span className="text-sm font-medium text-purple-800">Precio venta del inmueble</span>
+                            <span className="text-sm font-medium text-purple-800">
+                              Precio del inmueble en nuestra plataforma
+                            </span>
                           </div>
                           <p className="text-lg font-bold text-purple-700">{formatCurrency(propertySalePrice)}</p>
                           <p className="text-xs text-purple-600 mt-1">
@@ -1113,10 +1116,10 @@ export function AssetDetails({ id }: AssetDetailsProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {asset.precio_idealista_venta_m2 && (
+                {propertySalePrice > 0 && superficie > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Precio venta m²</span>
-                    <span className="font-medium">{formatCurrency(asset.precio_idealista_venta_m2)}</span>
+                    <span className="text-muted-foreground">Precio en nuestra plataforma</span>
+                    <span className="font-medium">{formatCurrency(propertySalePrice)}</span>
                   </div>
                 )}
 
