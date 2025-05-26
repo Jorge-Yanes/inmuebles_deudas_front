@@ -14,7 +14,7 @@ import {
 import { db } from "@/lib/firebase"
 import type { Asset, AssetFilter } from "@/types/asset"
 import type { User } from "@/types/user"
-import { normalizeText, getFullAddress } from "@/lib/utils"
+import { normalizeText } from "@/lib/utils"
 
 // Cache para mejorar el rendimiento
 const propertyCache = new Map<string, Asset>()
@@ -57,35 +57,19 @@ export const convertDocToAsset = (doc: DocumentData): Asset => {
     property_type: data.property_type || data["Property Type"] || "OTHER",
     property_general_subtype: data.property_general_subtype || data["Property General Subtype"] || undefined,
 
-    // Ubicación
-    province: data.province || "",
-    city: data.city || "",
-    address: data.address || undefined,
-    numero: data.numero || undefined,
-    street_type: data.street_type || undefined,
-    street_no: data.street_no || undefined,
-    zip_code: data.zip_code || undefined,
-    floor: data.floor || undefined,
-    door: data.door || undefined,
-    comarca: data.comarca || undefined,
-
-    // Información catastral
-    direccion_texto_catastro: data.direccion_texto_catastro || undefined,
-    provincia_catastro: data.provincia_catastro || undefined,
-    municipio_catastro: data.municipio_catastro || undefined,
-    tipo_via_catastro: data.tipo_via_catastro || undefined,
-    nombre_via_catastro: data.nombre_via_catastro || undefined,
-    numero_portal_catastro: data.numero_portal_catastro || undefined,
+    // Ubicación - SOLO CAMPOS CATASTRALES
+    provincia_catastro: data.provincia_catastro || "",
+    municipio_catastro: data.municipio_catastro || "",
+    tipo_via_catastro: data.tipo_via_catastro || "",
+    nombre_via_catastro: data.nombre_via_catastro || "",
+    numero_portal_catastro: data.numero_portal_catastro || "",
     escalera_catastro: data.escalera_catastro || undefined,
     planta_catastro: data.planta_catastro || undefined,
     puerta_catastro: data.puerta_catastro || undefined,
-    codigo_postal_catastro: data.codigo_postal_catastro || undefined,
-    superficie_construida_m2: data.superficie_construida_m2 || undefined,
-    uso_predominante_inmueble: data.uso_predominante_inmueble || undefined,
-    ano_construccion_inmueble: data.ano_construccion_inmueble || undefined,
+    codigo_postal_catastro: data.codigo_postal_catastro || "",
 
-    // Características físicas
-    sqm: Number.parseFloat(data.sqm) || Number.parseFloat(data.superficie_construida_m2) || 0,
+    // Características físicas - SOLO SUPERFICIE CATASTRAL
+    superficie_construida_m2: data.superficie_construida_m2 || "0",
     rooms: data.rooms || undefined,
     bathrooms: data.bathrooms || undefined,
     has_parking: data.has_parking || undefined,
@@ -136,6 +120,8 @@ export const convertDocToAsset = (doc: DocumentData): Asset => {
     borrower_name: data.borrower_name || undefined,
     hip_under_re_mgmt: data.hip_under_re_mgmt || undefined,
     reference_code_1: data.reference_code_1 || undefined,
+    uso_predominante_inmueble: data.uso_predominante_inmueble || undefined,
+    ano_construccion_inmueble: data.ano_construccion_inmueble || undefined,
 
     // Campos para UI
     imageUrl: data.imageUrl || undefined,
@@ -179,12 +165,8 @@ function generateTitle(asset: Asset): string {
   }
 
   const type = propertyTypeLabels[asset.property_type] || asset.property_type
-  const location = asset.city || asset.province || asset.municipio_catastro || asset.provincia_catastro
-  const size = asset.sqm
-    ? `${asset.sqm}m²`
-    : asset.superficie_construida_m2
-      ? `${asset.superficie_construida_m2}m²`
-      : ""
+  const location = asset.municipio_catastro || asset.provincia_catastro
+  const size = asset.superficie_construida_m2 ? `${asset.superficie_construida_m2}m²` : ""
 
   let title = `${type} en ${location}`
   if (size) title += ` de ${size}`
@@ -231,17 +213,12 @@ function generateDescription(asset: Asset): string {
 
   const type = propertyTypeLabels[asset.property_type] || asset.property_type
 
-  // Obtener dirección completa
+  // Obtener dirección completa usando solo campos catastrales
   const address = getFullAddress(asset)
-  const city = asset.city || asset.municipio_catastro || "ciudad no disponible"
-  const province = asset.province || asset.provincia_catastro || "provincia no disponible"
 
-  let description = `${type} ubicado en ${address}, ${city}, ${province}.`
+  let description = `${type} ubicado en ${address}, ${asset.municipio_catastro}, ${asset.provincia_catastro}.`
 
-  if (asset.sqm) description += ` Superficie de ${asset.sqm}m².`
-  else if (asset.superficie_construida_m2)
-    description += ` Superficie construida de ${asset.superficie_construida_m2}m².`
-
+  if (asset.superficie_construida_m2) description += ` Superficie construida de ${asset.superficie_construida_m2}m².`
   if (asset.rooms) description += ` ${asset.rooms} habitaciones.`
   if (asset.bathrooms) description += ` ${asset.bathrooms} baños.`
   if (asset.extras) description += ` ${asset.extras}.`
@@ -255,6 +232,37 @@ function generateDescription(asset: Asset): string {
   }
 
   return description
+}
+
+// Función para obtener la dirección completa usando SOLO campos catastrales
+function getFullAddress(asset: Asset): string {
+  const components = []
+
+  if (asset.tipo_via_catastro && asset.nombre_via_catastro) {
+    components.push(`${asset.tipo_via_catastro} ${asset.nombre_via_catastro}`)
+  }
+
+  if (asset.numero_portal_catastro) {
+    components.push(asset.numero_portal_catastro)
+  }
+
+  if (asset.escalera_catastro) {
+    components.push(`Esc. ${asset.escalera_catastro}`)
+  }
+
+  if (asset.planta_catastro) {
+    components.push(`Planta ${asset.planta_catastro}`)
+  }
+
+  if (asset.puerta_catastro) {
+    components.push(`Puerta ${asset.puerta_catastro}`)
+  }
+
+  if (components.length > 0) {
+    return components.join(", ")
+  }
+
+  return "Dirección no disponible"
 }
 
 // Obtener una propiedad por ID
@@ -365,7 +373,6 @@ export async function getProperties(
     }
 
     // 2. Para consultas filtradas, obtendremos todas las propiedades y filtraremos del lado del cliente
-    // Esto es menos eficiente pero evita requisitos de índice
     const allProperties = await getAllProperties(500) // Límite a 500 para evitar lecturas excesivas
 
     // Aplicar filtros del lado del cliente
@@ -375,7 +382,7 @@ export async function getProperties(
       filteredProperties = allProperties.filter((asset) => {
         let include = true
 
-        // Aplicar todos los filtros
+        // Aplicar todos los filtros usando SOLO campos catastrales
         if (filters.property_type && filters.property_type !== "ALL" && asset.property_type !== filters.property_type) {
           include = false
         }
@@ -398,15 +405,30 @@ export async function getProperties(
           include = false
         }
 
-        if (include && filters.province && filters.province !== "ALL" && asset.province !== filters.province) {
+        if (
+          include &&
+          filters.provincia_catastro &&
+          filters.provincia_catastro !== "ALL" &&
+          asset.provincia_catastro !== filters.provincia_catastro
+        ) {
           include = false
         }
 
-        if (include && filters.city && filters.city !== "ALL" && asset.city !== filters.city) {
+        if (
+          include &&
+          filters.municipio_catastro &&
+          filters.municipio_catastro !== "ALL" &&
+          asset.municipio_catastro !== filters.municipio_catastro
+        ) {
           include = false
         }
 
-        if (include && filters.comarca && filters.comarca !== "ALL" && asset.comarca !== filters.comarca) {
+        if (
+          include &&
+          filters.tipo_via_catastro &&
+          filters.tipo_via_catastro !== "ALL" &&
+          asset.tipo_via_catastro !== filters.tipo_via_catastro
+        ) {
           include = false
         }
 
@@ -419,11 +441,13 @@ export async function getProperties(
           include = false
         }
 
-        if (include && filters.minSqm && asset.sqm && asset.sqm < filters.minSqm) {
+        // Usar superficie_construida_m2 en lugar de sqm
+        const superficie = Number.parseFloat(asset.superficie_construida_m2) || 0
+        if (include && filters.minSqm && superficie < filters.minSqm) {
           include = false
         }
 
-        if (include && filters.maxSqm && asset.sqm && asset.sqm > filters.maxSqm) {
+        if (include && filters.maxSqm && superficie > filters.maxSqm) {
           include = false
         }
 
@@ -562,8 +586,8 @@ export async function getPropertyStats(userId?: string): Promise<{
         totalValue += data.price_approx
       }
 
-      if (data.city) {
-        locations.add(data.city)
+      if (data.municipio_catastro) {
+        locations.add(data.municipio_catastro)
       }
     })
 
@@ -597,24 +621,23 @@ export async function searchProperties(query: string): Promise<Asset[]> {
     const allProperties = await getAllProperties(500)
     const normalizedQuery = normalizeText(query.toLowerCase())
 
-    // Filtrar por la consulta de búsqueda
+    // Filtrar por la consulta de búsqueda usando SOLO campos catastrales
     const results = allProperties.filter((asset) => {
-      // Buscar en múltiples campos
+      // Buscar en múltiples campos catastrales
       const searchableFields = [
         asset.reference_code,
-        asset.address,
-        asset.direccion_texto_catastro,
-        asset.city,
-        asset.municipio_catastro,
-        asset.province,
         asset.provincia_catastro,
+        asset.municipio_catastro,
+        asset.tipo_via_catastro,
+        asset.nombre_via_catastro,
+        asset.numero_portal_catastro,
+        asset.codigo_postal_catastro,
         asset.property_type,
         asset.property_general_subtype,
         asset.marketing_status,
         asset.legal_phase,
         asset.extras,
         asset.uso_predominante_inmueble,
-        asset.comarca,
       ]
         .filter(Boolean)
         .map((field) => normalizeText(field || ""))
@@ -637,9 +660,9 @@ export async function getFilteredProperties(filters: Record<string, string | und
       property_type: filters.property_type,
       marketing_status: filters.marketing_status,
       legal_phase: filters.legal_phase,
-      province: filters.province,
-      city: filters.city,
-      comarca: filters.comarca,
+      provincia_catastro: filters.provincia_catastro,
+      municipio_catastro: filters.municipio_catastro,
+      tipo_via_catastro: filters.tipo_via_catastro,
       minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
       maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
       minSqm: filters.minSqm ? Number(filters.minSqm) : undefined,
@@ -663,39 +686,39 @@ export async function getFilteredProperties(filters: Record<string, string | und
   }
 }
 
-// Obtener provincias
-export async function getProvinces(): Promise<string[]> {
-  return getUniqueFieldValues("province")
+// Obtener provincias catastrales
+export async function getProvincias(): Promise<string[]> {
+  return getUniqueFieldValues("provincia_catastro")
 }
 
-// Obtener comarcas
-export async function getComarcas(): Promise<string[]> {
-  return getUniqueFieldValues("comarca")
-}
-
-// Obtener ciudades
-export async function getCities(province?: string): Promise<string[]> {
+// Obtener municipios catastrales
+export async function getMunicipios(provincia?: string): Promise<string[]> {
   try {
-    // Si no se especifica provincia, simplemente obtener todas las ciudades únicas
-    if (!province || province === "ALL") {
-      return getUniqueFieldValues("city")
+    // Si no se especifica provincia, simplemente obtener todos los municipios únicos
+    if (!provincia || provincia === "ALL") {
+      return getUniqueFieldValues("municipio_catastro")
     }
 
     // De lo contrario, obtener todas las propiedades y filtrar del lado del cliente
     const allProperties = await getAllProperties(500)
-    const cities = new Set<string>()
+    const municipios = new Set<string>()
 
     allProperties.forEach((asset) => {
-      if (asset.province === province && asset.city) {
-        cities.add(asset.city)
+      if (asset.provincia_catastro === provincia && asset.municipio_catastro) {
+        municipios.add(asset.municipio_catastro)
       }
     })
 
-    return Array.from(cities).sort()
+    return Array.from(municipios).sort()
   } catch (error) {
-    console.error("Error fetching cities:", error)
+    console.error("Error fetching municipios:", error)
     return []
   }
+}
+
+// Obtener tipos de vía catastrales
+export async function getTiposVia(): Promise<string[]> {
+  return getUniqueFieldValues("tipo_via_catastro")
 }
 
 // Obtener tipos de propiedad
@@ -726,4 +749,32 @@ export async function getRoomCounts(): Promise<string[]> {
 // Obtener número de baños únicos
 export async function getBathroomCounts(): Promise<string[]> {
   return getUniqueFieldValues("bathrooms")
+}
+
+// Alias para mantener compatibilidad con código existente
+export const getProvinces = getProvincias
+
+// Alias para mantener compatibilidad con código existente
+export const getCities = getMunicipios
+
+// Obtener comarcas (mantener función original si existe en los datos)
+export async function getComarcas(): Promise<string[]> {
+  try {
+    // Intentar obtener comarcas si el campo existe en los datos
+    const querySnapshot = await getDocs(collection(db, "inmueblesMayo"))
+    const uniqueValues = new Set<string>()
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      // Buscar en posibles campos de comarca
+      if (data.comarca) {
+        uniqueValues.add(data.comarca)
+      }
+    })
+
+    return Array.from(uniqueValues).sort()
+  } catch (error) {
+    console.error("Error fetching comarcas:", error)
+    return []
+  }
 }

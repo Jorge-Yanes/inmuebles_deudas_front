@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Building, Home, MapPin, Ruler, User, Calendar } from "lucide-react"
+import { Building, Home, MapPin, Ruler, User, Calendar, TrendingUp } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getPropertyById } from "@/lib/firestore/property-service"
@@ -17,6 +17,9 @@ import {
   propertyTypeLabels,
   legalPhaseLabels,
   getFullAddress,
+  getSuperficie,
+  calculateMarketValue,
+  calculateRentalMarketValue,
 } from "@/types/asset"
 import AssetMap from "./maps/asset-map"
 import dynamic from "next/dynamic"
@@ -75,6 +78,9 @@ export function AssetDetails({ id }: AssetDetailsProps) {
     marketingStatusLabels[asset.marketing_status || "AVAILABLE"] || asset.marketing_status || "Disponible"
   const legalPhase = legalPhaseLabels[asset.legal_phase || ""] || asset.legal_phase
   const fullAddress = getFullAddress(asset)
+  const superficie = getSuperficie(asset)
+  const marketValue = calculateMarketValue(asset)
+  const rentalMarketValue = calculateRentalMarketValue(asset)
 
   // Definir pestañas disponibles según permisos
   const availableTabs = ["description", "details", "cadastral"]
@@ -96,10 +102,10 @@ export function AssetDetails({ id }: AssetDetailsProps) {
         </div>
 
         <div className="mt-6">
-          <h2 className="text-2xl font-bold">{asset.title || `${propertyType} en ${asset.city}`}</h2>
+          <h2 className="text-2xl font-bold">{asset.title || `${propertyType} en ${asset.municipio_catastro}`}</h2>
           <div className="mt-2 flex items-center text-muted-foreground">
             <MapPin className="mr-1 h-5 w-5" />
-            {fullAddress}, {asset.city || asset.municipio_catastro}, {asset.province || asset.provincia_catastro}
+            {fullAddress}, {asset.municipio_catastro}, {asset.provincia_catastro}
           </div>
           <ConditionalField fieldName="reference_code">
             {asset.reference_code && (
@@ -131,7 +137,7 @@ export function AssetDetails({ id }: AssetDetailsProps) {
               <Ruler className="h-5 w-5 text-muted-foreground" />
               <div>
                 <p className="text-sm text-muted-foreground">Superficie</p>
-                <p className="font-medium">{asset.sqm || asset.superficie_construida_m2 || "N/A"} m²</p>
+                <p className="font-medium">{asset.superficie_construida_m2 || "N/A"} m²</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -195,7 +201,7 @@ export function AssetDetails({ id }: AssetDetailsProps) {
             <TabsContent value="description" className="mt-4">
               <p>
                 {asset.description ||
-                  `${propertyType} ubicado en ${fullAddress}, ${asset.city || asset.municipio_catastro}, ${asset.province || asset.provincia_catastro}. Superficie de ${asset.sqm || asset.superficie_construida_m2 || "N/A"}m².`}
+                  `${propertyType} ubicado en ${fullAddress}, ${asset.municipio_catastro}, ${asset.provincia_catastro}. Superficie construida de ${asset.superficie_construida_m2 || "N/A"}m².`}
               </p>
               <ConditionalField fieldName="extras">
                 {asset.extras && (
@@ -258,44 +264,36 @@ export function AssetDetails({ id }: AssetDetailsProps) {
                         <span>{fullAddress}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Ciudad:</span>
-                        <span>{asset.city || asset.municipio_catastro || "N/A"}</span>
+                        <span className="text-muted-foreground">Municipio:</span>
+                        <span>{asset.municipio_catastro || "N/A"}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Provincia:</span>
-                        <span>{asset.province || asset.provincia_catastro || "N/A"}</span>
+                        <span>{asset.provincia_catastro || "N/A"}</span>
                       </div>
-                      <ConditionalField fieldName="comarca">
-                        {asset.comarca && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Comarca:</span>
-                            <span>{asset.comarca}</span>
-                          </div>
-                        )}
-                      </ConditionalField>
-                      <ConditionalField fieldName="zip_code">
-                        {(asset.zip_code || asset.codigo_postal_catastro) && (
+                      <ConditionalField fieldName="codigo_postal_catastro">
+                        {asset.codigo_postal_catastro && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Código postal:</span>
-                            <span>{asset.zip_code || asset.codigo_postal_catastro}</span>
+                            <span>{asset.codigo_postal_catastro}</span>
                           </div>
                         )}
                       </ConditionalField>
 
-                      <ConditionalField fieldName="floor">
-                        {(asset.floor || asset.planta_catastro) && (
+                      <ConditionalField fieldName="planta_catastro">
+                        {asset.planta_catastro && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Planta:</span>
-                            <span>{asset.floor || asset.planta_catastro}</span>
+                            <span>{asset.planta_catastro}</span>
                           </div>
                         )}
                       </ConditionalField>
 
-                      <ConditionalField fieldName="door">
-                        {(asset.door || asset.puerta_catastro) && (
+                      <ConditionalField fieldName="puerta_catastro">
+                        {asset.puerta_catastro && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Puerta:</span>
-                            <span>{asset.door || asset.puerta_catastro}</span>
+                            <span>{asset.puerta_catastro}</span>
                           </div>
                         )}
                       </ConditionalField>
@@ -320,7 +318,7 @@ export function AssetDetails({ id }: AssetDetailsProps) {
                       </ConditionalField>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Superficie:</span>
-                        <span>{asset.sqm || asset.superficie_construida_m2 || "N/A"} m²</span>
+                        <span>{asset.superficie_construida_m2 || "N/A"} m²</span>
                       </div>
                       <ConditionalField fieldName="rooms">
                         {asset.rooms && (
@@ -391,40 +389,39 @@ export function AssetDetails({ id }: AssetDetailsProps) {
                   <div>
                     <h4 className="font-medium">Datos Catastrales</h4>
                     <div className="mt-2 space-y-2">
-                      <ConditionalField fieldName="direccion_texto_catastro">
-                        {asset.direccion_texto_catastro && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Dirección catastral:</span>
-                            <span>{asset.direccion_texto_catastro}</span>
-                          </div>
-                        )}
+                      <ConditionalField fieldName="provincia_catastro">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Provincia:</span>
+                          <span>{asset.provincia_catastro}</span>
+                        </div>
                       </ConditionalField>
 
                       <ConditionalField fieldName="municipio_catastro">
-                        {asset.municipio_catastro && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Municipio (catastro):</span>
-                            <span>{asset.municipio_catastro}</span>
-                          </div>
-                        )}
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Municipio:</span>
+                          <span>{asset.municipio_catastro}</span>
+                        </div>
                       </ConditionalField>
 
-                      <ConditionalField fieldName="provincia_catastro">
-                        {asset.provincia_catastro && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Provincia (catastro):</span>
-                            <span>{asset.provincia_catastro}</span>
-                          </div>
-                        )}
+                      <ConditionalField fieldName="tipo_via_catastro">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Tipo de vía:</span>
+                          <span>{asset.tipo_via_catastro}</span>
+                        </div>
                       </ConditionalField>
 
-                      <ConditionalField fieldName="codigo_postal_catastro">
-                        {asset.codigo_postal_catastro && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Código postal (catastro):</span>
-                            <span>{asset.codigo_postal_catastro}</span>
-                          </div>
-                        )}
+                      <ConditionalField fieldName="nombre_via_catastro">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Nombre de vía:</span>
+                          <span>{asset.nombre_via_catastro}</span>
+                        </div>
+                      </ConditionalField>
+
+                      <ConditionalField fieldName="numero_portal_catastro">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Número portal:</span>
+                          <span>{asset.numero_portal_catastro}</span>
+                        </div>
                       </ConditionalField>
                     </div>
                   </div>
@@ -434,33 +431,6 @@ export function AssetDetails({ id }: AssetDetailsProps) {
                   <div>
                     <h4 className="font-medium">Detalles Catastrales</h4>
                     <div className="mt-2 space-y-2">
-                      <ConditionalField fieldName="tipo_via_catastro">
-                        {asset.tipo_via_catastro && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Tipo de vía:</span>
-                            <span>{asset.tipo_via_catastro}</span>
-                          </div>
-                        )}
-                      </ConditionalField>
-
-                      <ConditionalField fieldName="nombre_via_catastro">
-                        {asset.nombre_via_catastro && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Nombre de vía:</span>
-                            <span>{asset.nombre_via_catastro}</span>
-                          </div>
-                        )}
-                      </ConditionalField>
-
-                      <ConditionalField fieldName="numero_portal_catastro">
-                        {asset.numero_portal_catastro && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Número portal:</span>
-                            <span>{asset.numero_portal_catastro}</span>
-                          </div>
-                        )}
-                      </ConditionalField>
-
                       <ConditionalField fieldName="escalera_catastro">
                         {asset.escalera_catastro && (
                           <div className="flex justify-between">
@@ -488,13 +458,18 @@ export function AssetDetails({ id }: AssetDetailsProps) {
                         )}
                       </ConditionalField>
 
+                      <ConditionalField fieldName="codigo_postal_catastro">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Código postal:</span>
+                          <span>{asset.codigo_postal_catastro}</span>
+                        </div>
+                      </ConditionalField>
+
                       <ConditionalField fieldName="superficie_construida_m2">
-                        {asset.superficie_construida_m2 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Superficie construida:</span>
-                            <span>{asset.superficie_construida_m2} m²</span>
-                          </div>
-                        )}
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Superficie construida:</span>
+                          <span>{asset.superficie_construida_m2} m²</span>
+                        </div>
                       </ConditionalField>
                     </div>
                   </div>
@@ -720,13 +695,16 @@ export function AssetDetails({ id }: AssetDetailsProps) {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-4">
                   <div>
-                    <h4 className="font-medium">Datos de Mercado (Idealista)</h4>
+                    <h4 className="font-medium flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5" />
+                      Datos de Mercado
+                    </h4>
                     <div className="mt-2 space-y-2">
                       <ConditionalField fieldName="precio_idealista_venta_m2">
                         {asset.precio_idealista_venta_m2 && (
                           <div className="flex justify-between">
-                            <span className="text-muted-foreground">Precio venta por m²:</span>
-                            <span>{formatCurrency(asset.precio_idealista_venta_m2)}</span>
+                            <span className="text-muted-foreground">Precio venta m²:</span>
+                            <span className="font-medium">{formatCurrency(asset.precio_idealista_venta_m2)}</span>
                           </div>
                         )}
                       </ConditionalField>
@@ -734,23 +712,23 @@ export function AssetDetails({ id }: AssetDetailsProps) {
                       <ConditionalField fieldName="precio_idealista_alquiler_m2">
                         {asset.precio_idealista_alquiler_m2 && (
                           <div className="flex justify-between">
-                            <span className="text-muted-foreground">Precio alquiler por m²:</span>
-                            <span>{formatCurrency(asset.precio_idealista_alquiler_m2)}</span>
+                            <span className="text-muted-foreground">Precio alquiler m²:</span>
+                            <span className="font-medium">{formatCurrency(asset.precio_idealista_alquiler_m2)}</span>
                           </div>
                         )}
                       </ConditionalField>
 
-                      {asset.sqm && asset.precio_idealista_venta_m2 && (
+                      {marketValue > 0 && (
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Valor estimado de mercado:</span>
-                          <span>{formatCurrency(asset.sqm * asset.precio_idealista_venta_m2)}</span>
+                          <span className="text-muted-foreground">Valor mercado:</span>
+                          <span className="font-medium text-green-600">{formatCurrency(marketValue)}</span>
                         </div>
                       )}
 
-                      {asset.sqm && asset.precio_idealista_alquiler_m2 && (
+                      {rentalMarketValue > 0 && (
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Alquiler mensual estimado:</span>
-                          <span>{formatCurrency(asset.sqm * asset.precio_idealista_alquiler_m2)}</span>
+                          <span className="text-muted-foreground">Valor de alquiler mercado:</span>
+                          <span className="font-medium text-blue-600">{formatCurrency(rentalMarketValue)}</span>
                         </div>
                       )}
                     </div>
@@ -761,33 +739,29 @@ export function AssetDetails({ id }: AssetDetailsProps) {
                   <div>
                     <h4 className="font-medium">Análisis de Rentabilidad</h4>
                     <div className="mt-2 space-y-2">
-                      {asset.price_approx && asset.precio_idealista_venta_m2 && asset.sqm && (
+                      {asset.price_approx && marketValue > 0 && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Diferencia con mercado:</span>
-                          <span>
-                            {formatCurrency(asset.sqm * asset.precio_idealista_venta_m2 - asset.price_approx)}
+                          <span className={marketValue - asset.price_approx > 0 ? "text-green-600" : "text-red-600"}>
+                            {formatCurrency(marketValue - asset.price_approx)}
                           </span>
                         </div>
                       )}
 
-                      {asset.price_approx && asset.precio_idealista_venta_m2 && asset.sqm && (
+                      {asset.price_approx && marketValue > 0 && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Descuento sobre mercado:</span>
-                          <span>
-                            {Math.round((1 - asset.price_approx / (asset.sqm * asset.precio_idealista_venta_m2)) * 100)}
-                            %
+                          <span className="font-medium">
+                            {Math.round((1 - asset.price_approx / marketValue) * 100)}%
                           </span>
                         </div>
                       )}
 
-                      {asset.price_approx && asset.precio_idealista_alquiler_m2 && asset.sqm && (
+                      {asset.price_approx && rentalMarketValue > 0 && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Rentabilidad bruta anual:</span>
-                          <span>
-                            {Math.round(
-                              ((asset.sqm * asset.precio_idealista_alquiler_m2 * 12) / asset.price_approx) * 100,
-                            )}
-                            %
+                          <span className="font-medium text-green-600">
+                            {Math.round(((rentalMarketValue * 12) / asset.price_approx) * 100)}%
                           </span>
                         </div>
                       )}
@@ -820,7 +794,7 @@ export function AssetDetails({ id }: AssetDetailsProps) {
 
             <div className="flex justify-between">
               <span className="text-muted-foreground">Superficie</span>
-              <span className="font-medium">{asset.sqm || asset.superficie_construida_m2 || "N/A"} m²</span>
+              <span className="font-medium">{asset.superficie_construida_m2 || "N/A"} m²</span>
             </div>
 
             <RestrictedValue
@@ -871,26 +845,18 @@ export function AssetDetails({ id }: AssetDetailsProps) {
               <span className="font-medium text-right">{fullAddress}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Ciudad</span>
-              <span className="font-medium">{asset.city || asset.municipio_catastro || "N/A"}</span>
+              <span className="text-muted-foreground">Municipio</span>
+              <span className="font-medium">{asset.municipio_catastro || "N/A"}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Provincia</span>
-              <span className="font-medium">{asset.province || asset.provincia_catastro || "N/A"}</span>
+              <span className="font-medium">{asset.provincia_catastro || "N/A"}</span>
             </div>
-            <ConditionalField fieldName="comarca">
-              {asset.comarca && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Comarca</span>
-                  <span className="font-medium">{asset.comarca}</span>
-                </div>
-              )}
-            </ConditionalField>
-            <ConditionalField fieldName="zip_code">
-              {(asset.zip_code || asset.codigo_postal_catastro) && (
+            <ConditionalField fieldName="codigo_postal_catastro">
+              {asset.codigo_postal_catastro && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Código Postal</span>
-                  <span className="font-medium">{asset.zip_code || asset.codigo_postal_catastro}</span>
+                  <span className="font-medium">{asset.codigo_postal_catastro}</span>
                 </div>
               )}
             </ConditionalField>
@@ -949,7 +915,10 @@ export function AssetDetails({ id }: AssetDetailsProps) {
           {(asset.precio_idealista_venta_m2 || asset.precio_idealista_alquiler_m2) && (
             <Card className="mt-4">
               <CardHeader>
-                <CardTitle>Datos de Mercado</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Datos de Mercado
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {asset.precio_idealista_venta_m2 && (
@@ -959,17 +928,17 @@ export function AssetDetails({ id }: AssetDetailsProps) {
                   </div>
                 )}
 
-                {asset.precio_idealista_alquiler_m2 && (
+                {marketValue > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Precio alquiler m²</span>
-                    <span className="font-medium">{formatCurrency(asset.precio_idealista_alquiler_m2)}</span>
+                    <span className="text-muted-foreground">Valor mercado</span>
+                    <span className="font-medium text-green-600">{formatCurrency(marketValue)}</span>
                   </div>
                 )}
 
-                {asset.sqm && asset.precio_idealista_venta_m2 && (
+                {rentalMarketValue > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Valor mercado est.</span>
-                    <span className="font-medium">{formatCurrency(asset.sqm * asset.precio_idealista_venta_m2)}</span>
+                    <span className="text-muted-foreground">Valor alquiler mercado</span>
+                    <span className="font-medium text-blue-600">{formatCurrency(rentalMarketValue)}</span>
                   </div>
                 )}
               </CardContent>

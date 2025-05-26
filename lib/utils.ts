@@ -21,13 +21,8 @@ export function normalizeText(text: string): string {
 // Función para generar un título descriptivo para la propiedad
 export function generateTitle(asset: Asset): string {
   const type = propertyTypeLabels[asset.property_type] || asset.property_type
-  const location =
-    asset.city || asset.province || asset.municipio_catastro || asset.provincia_catastro || "ubicación desconocida"
-  const size = asset.sqm
-    ? `${asset.sqm}m²`
-    : asset.superficie_construida_m2
-      ? `${asset.superficie_construida_m2}m²`
-      : ""
+  const location = asset.municipio_catastro || asset.provincia_catastro || "ubicación desconocida"
+  const size = asset.superficie_construida_m2 ? `${asset.superficie_construida_m2}m²` : ""
 
   let title = `${type} en ${location}`
   if (size) title += ` de ${size}`
@@ -40,17 +35,12 @@ export function generateTitle(asset: Asset): string {
 export function generateDescription(asset: Asset): string {
   const type = propertyTypeLabels[asset.property_type] || asset.property_type
 
-  // Obtener dirección completa
+  // Obtener dirección completa usando SOLO campos catastrales
   const address = getFullAddress(asset)
-  const city = asset.city || asset.municipio_catastro || "ciudad no disponible"
-  const province = asset.province || asset.provincia_catastro || "provincia no disponible"
 
-  let description = `${type} ubicado en ${address}, ${city}, ${province}.`
+  let description = `${type} ubicado en ${address}, ${asset.municipio_catastro}, ${asset.provincia_catastro}.`
 
-  if (asset.sqm) description += ` Superficie de ${asset.sqm}m².`
-  else if (asset.superficie_construida_m2)
-    description += ` Superficie construida de ${asset.superficie_construida_m2}m².`
-
+  if (asset.superficie_construida_m2) description += ` Superficie construida de ${asset.superficie_construida_m2}m².`
   if (asset.rooms) description += ` ${asset.rooms} habitaciones.`
   if (asset.bathrooms) description += ` ${asset.bathrooms} baños.`
   if (asset.extras) description += ` ${asset.extras}.`
@@ -66,45 +56,29 @@ export function generateDescription(asset: Asset): string {
   return description
 }
 
-// Función para obtener la dirección completa
+// Función para obtener la dirección completa usando SOLO campos catastrales
 export function getFullAddress(asset: Asset): string {
-  // Primero intentamos usar la dirección ya formateada si existe
-  if (asset.address) return asset.address
-
-  // Si no, intentamos usar la dirección del catastro
-  if (asset.direccion_texto_catastro) return asset.direccion_texto_catastro
-
-  // Si no, construimos la dirección a partir de los componentes individuales
   const components = []
 
-  // Intentamos primero con los datos de catastro
+  // Construir dirección usando solo datos catastrales
   if (asset.tipo_via_catastro && asset.nombre_via_catastro) {
     components.push(`${asset.tipo_via_catastro} ${asset.nombre_via_catastro}`)
-    if (asset.numero_portal_catastro) {
-      components.push(asset.numero_portal_catastro)
-    }
-    if (asset.escalera_catastro) {
-      components.push(`Esc. ${asset.escalera_catastro}`)
-    }
-    if (asset.planta_catastro) {
-      components.push(`Planta ${asset.planta_catastro}`)
-    }
-    if (asset.puerta_catastro) {
-      components.push(`Puerta ${asset.puerta_catastro}`)
-    }
   }
-  // Si no hay datos de catastro, usamos los datos generales
-  else if (asset.street_type && asset.street_no) {
-    components.push(`${asset.street_type} ${asset.street_no}`)
-    if (asset.numero) {
-      components.push(asset.numero)
-    }
-    if (asset.floor) {
-      components.push(`Planta ${asset.floor}`)
-    }
-    if (asset.door) {
-      components.push(`Puerta ${asset.door}`)
-    }
+
+  if (asset.numero_portal_catastro) {
+    components.push(asset.numero_portal_catastro)
+  }
+
+  if (asset.escalera_catastro) {
+    components.push(`Esc. ${asset.escalera_catastro}`)
+  }
+
+  if (asset.planta_catastro) {
+    components.push(`Planta ${asset.planta_catastro}`)
+  }
+
+  if (asset.puerta_catastro) {
+    components.push(`Puerta ${asset.puerta_catastro}`)
   }
 
   if (components.length > 0) {
@@ -123,4 +97,25 @@ export function formatCurrency(value?: number): string {
     currency: "EUR",
     maximumFractionDigits: 0,
   }).format(value)
+}
+
+// Función para obtener la superficie como número
+export function getSuperficie(asset: Asset): number {
+  if (!asset.superficie_construida_m2) return 0
+  const superficie = Number.parseFloat(asset.superficie_construida_m2.toString())
+  return isNaN(superficie) ? 0 : superficie
+}
+
+// Función para calcular el valor de mercado
+export function calculateMarketValue(asset: Asset): number {
+  const superficie = getSuperficie(asset)
+  if (!superficie || !asset.precio_idealista_venta_m2) return 0
+  return superficie * asset.precio_idealista_venta_m2
+}
+
+// Función para calcular el valor de alquiler de mercado
+export function calculateRentalMarketValue(asset: Asset): number {
+  const superficie = getSuperficie(asset)
+  if (!superficie || !asset.precio_idealista_alquiler_m2) return 0
+  return superficie * asset.precio_idealista_alquiler_m2
 }
