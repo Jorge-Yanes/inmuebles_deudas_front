@@ -13,8 +13,9 @@ import {
   getPropertyTypes,
   getMarketingStatuses,
   getLegalPhases,
-  getProvinces,
-  getCities,
+  getProvincias,
+  getMunicipios,
+  getTiposVia,
 } from "@/lib/firestore/property-service"
 import { propertyTypeLabels } from "@/types/asset"
 
@@ -30,8 +31,9 @@ export function SearchFilters({ searchParams }: SearchFiltersProps) {
   const [propertyTypes, setPropertyTypes] = useState<string[]>([])
   const [marketingStatuses, setMarketingStatuses] = useState<string[]>([])
   const [legalPhases, setLegalPhases] = useState<string[]>([])
-  const [provinces, setProvinces] = useState<string[]>([])
-  const [cities, setCities] = useState<string[]>([])
+  const [provincias, setProvincias] = useState<string[]>([])
+  const [municipios, setMunicipios] = useState<string[]>([])
+  const [tiposVia, setTiposVia] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
   // State for current filter values
@@ -39,8 +41,9 @@ export function SearchFilters({ searchParams }: SearchFiltersProps) {
     property_type: searchParams.property_type || "",
     marketing_status: searchParams.marketing_status || "",
     legal_phase: searchParams.legal_phase || "",
-    province: searchParams.province || "",
-    city: searchParams.city || "",
+    provincia_catastro: searchParams.provincia_catastro || "",
+    municipio_catastro: searchParams.municipio_catastro || "",
+    tipo_via_catastro: searchParams.tipo_via_catastro || "",
     minPrice: searchParams.minPrice || "",
     maxPrice: searchParams.maxPrice || "",
     minSqm: searchParams.minSqm || "",
@@ -50,6 +53,8 @@ export function SearchFilters({ searchParams }: SearchFiltersProps) {
     propertyFeatures: searchParams.propertyFeatures ? searchParams.propertyFeatures.split(",") : [],
     rooms: searchParams.rooms || "",
     bathrooms: searchParams.bathrooms || "",
+    minYear: searchParams.minYear || "",
+    maxYear: searchParams.maxYear || "",
   })
 
   // Fetch filter options
@@ -59,22 +64,24 @@ export function SearchFilters({ searchParams }: SearchFiltersProps) {
         setLoading(true)
 
         // Fetch all filter options in parallel
-        const [types, statuses, phases, provs] = await Promise.all([
+        const [types, statuses, phases, provs, tiposViaData] = await Promise.all([
           getPropertyTypes(),
           getMarketingStatuses(),
           getLegalPhases(),
-          getProvinces(),
+          getProvincias(),
+          getTiposVia(),
         ])
 
         setPropertyTypes(types)
         setMarketingStatuses(statuses)
         setLegalPhases(phases)
-        setProvinces(provs)
+        setProvincias(provs)
+        setTiposVia(tiposViaData)
 
-        // If province is selected, fetch cities for that province
-        if (filters.province) {
-          const citiesData = await getCities(filters.province)
-          setCities(citiesData)
+        // If provincia is selected, fetch municipios for that provincia
+        if (filters.provincia_catastro) {
+          const municipiosData = await getMunicipios(filters.provincia_catastro)
+          setMunicipios(municipiosData)
         }
       } catch (error) {
         console.error("Error fetching filter options:", error)
@@ -84,39 +91,39 @@ export function SearchFilters({ searchParams }: SearchFiltersProps) {
     }
 
     fetchFilterOptions()
-  }, [filters.province])
+  }, [filters.provincia_catastro])
 
-  // Update cities when province changes
+  // Update municipios when provincia changes
   useEffect(() => {
-    const updateCities = async () => {
-      if (filters.province) {
+    const updateMunicipios = async () => {
+      if (filters.provincia_catastro) {
         try {
-          const citiesData = await getCities(filters.province)
-          setCities(citiesData)
+          const municipiosData = await getMunicipios(filters.provincia_catastro)
+          setMunicipios(municipiosData)
 
-          // If the current city is not in the new list of cities, reset it
-          if (filters.city && !citiesData.includes(filters.city)) {
-            setFilters((prev) => ({ ...prev, city: "" }))
+          // If the current municipio is not in the new list, reset it
+          if (filters.municipio_catastro && !municipiosData.includes(filters.municipio_catastro)) {
+            setFilters((prev) => ({ ...prev, municipio_catastro: "" }))
           }
         } catch (error) {
-          console.error("Error fetching cities:", error)
+          console.error("Error fetching municipios:", error)
         }
       } else {
-        setCities([])
-        if (filters.city) {
-          setFilters((prev) => ({ ...prev, city: "" }))
+        setMunicipios([])
+        if (filters.municipio_catastro) {
+          setFilters((prev) => ({ ...prev, municipio_catastro: "" }))
         }
       }
     }
 
-    updateCities()
-  }, [filters.province])
+    updateMunicipios()
+  }, [filters.provincia_catastro])
 
   // Handle filter changes
   const handleFilterChange = (name: string, value: string | string[]) => {
-    // Special handling for province changes
-    if (name === "province" && value !== filters.province) {
-      setFilters((prev) => ({ ...prev, [name]: value, city: "" }))
+    // Special handling for provincia changes
+    if (name === "provincia_catastro" && value !== filters.provincia_catastro) {
+      setFilters((prev) => ({ ...prev, [name]: value, municipio_catastro: "" }))
     } else {
       setFilters((prev) => ({ ...prev, [name]: value }))
     }
@@ -163,8 +170,9 @@ export function SearchFilters({ searchParams }: SearchFiltersProps) {
       property_type: "",
       marketing_status: "",
       legal_phase: "",
-      province: "",
-      city: "",
+      provincia_catastro: "",
+      municipio_catastro: "",
+      tipo_via_catastro: "",
       minPrice: "",
       maxPrice: "",
       minSqm: "",
@@ -174,6 +182,8 @@ export function SearchFilters({ searchParams }: SearchFiltersProps) {
       propertyFeatures: [],
       rooms: "",
       bathrooms: "",
+      minYear: "",
+      maxYear: "",
     })
 
     router.push(pathname)
@@ -203,17 +213,17 @@ export function SearchFilters({ searchParams }: SearchFiltersProps) {
 
   return (
     <div className="p-4 space-y-6 overflow-auto max-h-screen">
-      <h2 className="text-lg font-semibold">Tu búsqueda</h2>
+      <h2 className="text-lg font-semibold">Filtros de Búsqueda</h2>
 
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="search-query">Ubicación</Label>
+          <Label htmlFor="search-query">Búsqueda General</Label>
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               id="search-query"
               type="text"
-              placeholder="Ciudad, provincia, código postal..."
+              placeholder="Provincia, municipio, tipo de vía, código postal..."
               className="pl-8"
               value={filters.query}
               onChange={(e) => handleFilterChange("query", e.target.value)}
@@ -232,6 +242,106 @@ export function SearchFilters({ searchParams }: SearchFiltersProps) {
               {propertyTypes.map((type) => (
                 <SelectItem key={type} value={type}>
                   {propertyTypeLabels[type] || type}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="provincia_catastro">Provincia</Label>
+          <Select
+            value={filters.provincia_catastro}
+            onValueChange={(value) => handleFilterChange("provincia_catastro", value)}
+          >
+            <SelectTrigger id="provincia_catastro">
+              <SelectValue placeholder="Todas las provincias" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las provincias</SelectItem>
+              {provincias.map((provincia) => (
+                <SelectItem key={provincia} value={provincia}>
+                  {provincia}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="municipio_catastro">Municipio</Label>
+          <Select
+            value={filters.municipio_catastro}
+            onValueChange={(value) => handleFilterChange("municipio_catastro", value)}
+            disabled={!filters.provincia_catastro}
+          >
+            <SelectTrigger id="municipio_catastro">
+              <SelectValue
+                placeholder={filters.provincia_catastro ? "Todos los municipios" : "Selecciona provincia primero"}
+              />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los municipios</SelectItem>
+              {municipios.map((municipio) => (
+                <SelectItem key={municipio} value={municipio}>
+                  {municipio}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="tipo_via_catastro">Tipo de Vía</Label>
+          <Select
+            value={filters.tipo_via_catastro}
+            onValueChange={(value) => handleFilterChange("tipo_via_catastro", value)}
+          >
+            <SelectTrigger id="tipo_via_catastro">
+              <SelectValue placeholder="Todos los tipos de vía" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los tipos de vía</SelectItem>
+              {tiposVia.map((tipo) => (
+                <SelectItem key={tipo} value={tipo}>
+                  {tipo}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="marketing_status">Estado de Marketing</Label>
+          <Select
+            value={filters.marketing_status}
+            onValueChange={(value) => handleFilterChange("marketing_status", value)}
+          >
+            <SelectTrigger id="marketing_status">
+              <SelectValue placeholder="Todos los estados" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              {marketingStatuses.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {status}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="legal_phase">Fase Legal</Label>
+          <Select value={filters.legal_phase} onValueChange={(value) => handleFilterChange("legal_phase", value)}>
+            <SelectTrigger id="legal_phase">
+              <SelectValue placeholder="Todas las fases" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las fases</SelectItem>
+              {legalPhases.map((phase) => (
+                <SelectItem key={phase} value={phase}>
+                  {phase}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -271,37 +381,7 @@ export function SearchFilters({ searchParams }: SearchFiltersProps) {
         </div>
 
         <div className="space-y-2">
-          <Label>Tipo de piso o casa</Label>
-          <div className="space-y-2">
-            {[
-              { id: "all", label: "Todos" },
-              { id: "apartment", label: "Pisos y apartamentos" },
-              { id: "studio", label: "Estudios" },
-              { id: "house", label: "Casas y chalets" },
-              { id: "duplex", label: "Dúplex" },
-              { id: "loft", label: "Lofts" },
-            ].map((item) => (
-              <div key={item.id} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`property-type-${item.id}`}
-                  checked={item.id === "all" ? !filters.property_type : filters.property_type === item.id.toUpperCase()}
-                  onCheckedChange={(checked) =>
-                    handleFilterChange("property_type", checked ? (item.id === "all" ? "" : item.id.toUpperCase()) : "")
-                  }
-                />
-                <label
-                  htmlFor={`property-type-${item.id}`}
-                  className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  {item.label}
-                </label>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Tamaño</Label>
+          <Label>Superficie (m²)</Label>
           <div className="grid grid-cols-2 gap-2">
             <Input
               placeholder="Mínimo"
@@ -319,7 +399,7 @@ export function SearchFilters({ searchParams }: SearchFiltersProps) {
         </div>
 
         <div className="space-y-2">
-          <Label>Precio</Label>
+          <Label>Precio (€)</Label>
           <div className="grid grid-cols-2 gap-2">
             <Input
               placeholder="Mínimo"
@@ -332,6 +412,24 @@ export function SearchFilters({ searchParams }: SearchFiltersProps) {
               type="number"
               value={filters.maxPrice}
               onChange={(e) => handleFilterChange("maxPrice", e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Año de Construcción</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <Input
+              placeholder="Desde"
+              type="number"
+              value={filters.minYear}
+              onChange={(e) => handleFilterChange("minYear", e.target.value)}
+            />
+            <Input
+              placeholder="Hasta"
+              type="number"
+              value={filters.maxYear}
+              onChange={(e) => handleFilterChange("maxYear", e.target.value)}
             />
           </div>
         </div>

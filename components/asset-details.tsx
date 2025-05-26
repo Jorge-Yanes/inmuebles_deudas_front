@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Building, Home, MapPin, Ruler, User, Calendar, TrendingUp } from "lucide-react"
+import { Building, Home, MapPin, Ruler, User, Calendar, TrendingUp, Euro, Calculator } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getPropertyById } from "@/lib/firestore/property-service"
@@ -82,6 +82,9 @@ export function AssetDetails({ id }: AssetDetailsProps) {
   const marketValue = calculateMarketValue(asset)
   const rentalMarketValue = calculateRentalMarketValue(asset)
 
+  // Calculate property sale price (using available debt/financial data)
+  const propertySalePrice = asset.price_approx || asset.gbv || asset.auction_base || asset.deuda || asset.DEUDA || 0
+
   // Definir pestañas disponibles según permisos
   const availableTabs = ["description", "details", "cadastral"]
   if (hasViewPermission("legal_phase") || hasViewPermission("legal_type")) {
@@ -137,7 +140,7 @@ export function AssetDetails({ id }: AssetDetailsProps) {
               <Ruler className="h-5 w-5 text-muted-foreground" />
               <div>
                 <p className="text-sm text-muted-foreground">Superficie</p>
-                <p className="font-medium">{asset.superficie_construida_m2 || "N/A"} m²</p>
+                <p className="font-medium">{superficie} m²</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -201,7 +204,7 @@ export function AssetDetails({ id }: AssetDetailsProps) {
             <TabsContent value="description" className="mt-4">
               <p>
                 {asset.description ||
-                  `${propertyType} ubicado en ${fullAddress}, ${asset.municipio_catastro}, ${asset.provincia_catastro}. Superficie construida de ${asset.superficie_construida_m2 || "N/A"}m².`}
+                  `${propertyType} ubicado en ${fullAddress}, ${asset.municipio_catastro}, ${asset.provincia_catastro}. Superficie construida de ${superficie}m².`}
               </p>
               <ConditionalField fieldName="extras">
                 {asset.extras && (
@@ -211,169 +214,253 @@ export function AssetDetails({ id }: AssetDetailsProps) {
                   </div>
                 )}
               </ConditionalField>
+              <ConditionalField fieldName="uso_predominante_inmueble">
+                {asset.uso_predominante_inmueble && (
+                  <div className="mt-4">
+                    <h4 className="font-medium">Uso predominante:</h4>
+                    <p className="mt-1">{asset.uso_predominante_inmueble}</p>
+                  </div>
+                )}
+              </ConditionalField>
             </TabsContent>
 
             <TabsContent value="details" className="mt-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="space-y-6">
                   <div>
-                    <h4 className="font-medium">Identificación</h4>
-                    <div className="mt-2 space-y-2">
+                    <h4 className="font-medium text-lg mb-3">Identificación</h4>
+                    <div className="space-y-3">
                       <ConditionalField fieldName="ndg">
                         {asset.ndg && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">NDG:</span>
-                            <span>{asset.ndg}</span>
+                            <span className="font-medium">{asset.ndg}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="reference_code">
                         {asset.reference_code && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Código de referencia:</span>
-                            <span>{asset.reference_code}</span>
+                            <span className="font-medium">{asset.reference_code}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="cadastral_reference">
                         {asset.cadastral_reference && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Referencia catastral:</span>
-                            <span>{asset.cadastral_reference}</span>
+                            <span className="font-medium">{asset.cadastral_reference}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="idufir">
                         {asset.idufir && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">IDUFIR:</span>
-                            <span>{asset.idufir}</span>
+                            <span className="font-medium">{asset.idufir}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
+
+                      <ConditionalField fieldName="property_id">
+                        {asset.property_id && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">ID Propiedad:</span>
+                            <span className="font-medium">{asset.property_id}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
+
+                      <ConditionalField fieldName="property_idh">
+                        {asset.property_idh && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Property IDH:</span>
+                            <span className="font-medium">{asset.property_idh}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
+
+                      <ConditionalField fieldName="property_bank_id">
+                        {asset.property_bank_id && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Bank ID:</span>
+                            <span className="font-medium">{asset.property_bank_id}</span>
                           </div>
                         )}
                       </ConditionalField>
                     </div>
                   </div>
+
                   <div>
-                    <h4 className="font-medium">Ubicación</h4>
-                    <div className="mt-2 space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Dirección:</span>
-                        <span>{fullAddress}</span>
+                    <h4 className="font-medium text-lg mb-3">Características</h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between py-1">
+                        <span className="text-muted-foreground">Tipo de propiedad:</span>
+                        <span className="font-medium">{propertyType}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Municipio:</span>
-                        <span>{asset.municipio_catastro || "N/A"}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Provincia:</span>
-                        <span>{asset.provincia_catastro || "N/A"}</span>
-                      </div>
-                      <ConditionalField fieldName="codigo_postal_catastro">
-                        {asset.codigo_postal_catastro && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Código postal:</span>
-                            <span>{asset.codigo_postal_catastro}</span>
+                      <ConditionalField fieldName="property_general_subtype">
+                        {asset.property_general_subtype && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Subtipo:</span>
+                            <span className="font-medium">{asset.property_general_subtype}</span>
                           </div>
                         )}
                       </ConditionalField>
-
-                      <ConditionalField fieldName="planta_catastro">
-                        {asset.planta_catastro && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Planta:</span>
-                            <span>{asset.planta_catastro}</span>
+                      <div className="flex justify-between py-1">
+                        <span className="text-muted-foreground">Superficie construida:</span>
+                        <span className="font-medium">{superficie} m²</span>
+                      </div>
+                      <ConditionalField fieldName="rooms">
+                        {asset.rooms && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Habitaciones:</span>
+                            <span className="font-medium">{asset.rooms}</span>
                           </div>
                         )}
                       </ConditionalField>
-
-                      <ConditionalField fieldName="puerta_catastro">
-                        {asset.puerta_catastro && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Puerta:</span>
-                            <span>{asset.puerta_catastro}</span>
+                      <ConditionalField fieldName="bathrooms">
+                        {asset.bathrooms && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Baños:</span>
+                            <span className="font-medium">{asset.bathrooms}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
+                      <ConditionalField fieldName="has_parking">
+                        {asset.has_parking && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Plaza de garaje:</span>
+                            <span className="font-medium">{asset.has_parking === "1" ? "Sí" : "No"}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
+                      <ConditionalField fieldName="ano_construccion_inmueble">
+                        {asset.ano_construccion_inmueble && asset.ano_construccion_inmueble !== "0" && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Año de construcción:</span>
+                            <span className="font-medium">{asset.ano_construccion_inmueble}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
+                      <ConditionalField fieldName="uso_predominante_inmueble">
+                        {asset.uso_predominante_inmueble && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Uso predominante:</span>
+                            <span className="font-medium">{asset.uso_predominante_inmueble}</span>
                           </div>
                         )}
                       </ConditionalField>
                     </div>
                   </div>
                 </div>
-                <div className="space-y-4">
+
+                <div className="space-y-6">
                   <div>
-                    <h4 className="font-medium">Características</h4>
-                    <div className="mt-2 space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Tipo de propiedad:</span>
-                        <span>{propertyType}</span>
+                    <h4 className="font-medium text-lg mb-3">Ubicación Catastral</h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between py-1">
+                        <span className="text-muted-foreground">Dirección completa:</span>
+                        <span className="font-medium text-right">{fullAddress}</span>
                       </div>
-                      <ConditionalField fieldName="property_general_subtype">
-                        {asset.property_general_subtype && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Subtipo:</span>
-                            <span>{asset.property_general_subtype}</span>
-                          </div>
-                        )}
-                      </ConditionalField>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Superficie:</span>
-                        <span>{asset.superficie_construida_m2 || "N/A"} m²</span>
+                      <div className="flex justify-between py-1">
+                        <span className="text-muted-foreground">Municipio:</span>
+                        <span className="font-medium">{asset.municipio_catastro}</span>
                       </div>
-                      <ConditionalField fieldName="rooms">
-                        {asset.rooms && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Habitaciones:</span>
-                            <span>{asset.rooms}</span>
+                      <div className="flex justify-between py-1">
+                        <span className="text-muted-foreground">Provincia:</span>
+                        <span className="font-medium">{asset.provincia_catastro}</span>
+                      </div>
+                      <ConditionalField fieldName="codigo_postal_catastro">
+                        {asset.codigo_postal_catastro && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Código postal:</span>
+                            <span className="font-medium">{asset.codigo_postal_catastro}</span>
                           </div>
                         )}
                       </ConditionalField>
-                      <ConditionalField fieldName="bathrooms">
-                        {asset.bathrooms && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Baños:</span>
-                            <span>{asset.bathrooms}</span>
+                      <ConditionalField fieldName="tipo_via_catastro">
+                        {asset.tipo_via_catastro && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Tipo de vía:</span>
+                            <span className="font-medium">{asset.tipo_via_catastro}</span>
                           </div>
                         )}
                       </ConditionalField>
-                      <ConditionalField fieldName="has_parking">
-                        {asset.has_parking && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Plaza de garaje:</span>
-                            <span>{asset.has_parking === "1" ? "Sí" : "No"}</span>
+                      <ConditionalField fieldName="nombre_via_catastro">
+                        {asset.nombre_via_catastro && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Nombre de vía:</span>
+                            <span className="font-medium">{asset.nombre_via_catastro}</span>
                           </div>
                         )}
                       </ConditionalField>
-                      <ConditionalField fieldName="ano_construccion_inmueble">
-                        {asset.ano_construccion_inmueble && asset.ano_construccion_inmueble !== "0" && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Año de construcción:</span>
-                            <span>{asset.ano_construccion_inmueble}</span>
-                          </div>
-                        )}
-                      </ConditionalField>
-                      <ConditionalField fieldName="uso_predominante_inmueble">
-                        {asset.uso_predominante_inmueble && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Uso predominante:</span>
-                            <span>{asset.uso_predominante_inmueble}</span>
+                      <ConditionalField fieldName="numero_portal_catastro">
+                        {asset.numero_portal_catastro && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Número portal:</span>
+                            <span className="font-medium">{asset.numero_portal_catastro}</span>
                           </div>
                         )}
                       </ConditionalField>
                     </div>
                   </div>
+
                   <div>
-                    <h4 className="font-medium">Estado</h4>
-                    <div className="mt-2 space-y-2">
-                      <div className="flex justify-between">
+                    <h4 className="font-medium text-lg mb-3">Estado y Gestión</h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between py-1">
                         <span className="text-muted-foreground">Estado de marketing:</span>
-                        <span>{marketingStatus}</span>
+                        <span className="font-medium">{marketingStatus}</span>
                       </div>
+                      <ConditionalField fieldName="registration_status">
+                        {asset.registration_status && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Estado de registro:</span>
+                            <span className="font-medium">{asset.registration_status}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
+                      <ConditionalField fieldName="working_status">
+                        {asset.working_status && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Estado de trabajo:</span>
+                            <span className="font-medium">{asset.working_status}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
                       <ConditionalField fieldName="estado_posesion_fisica">
                         {asset.estado_posesion_fisica && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Estado de posesión física:</span>
-                            <span>{asset.estado_posesion_fisica}</span>
+                            <span className="font-medium">{asset.estado_posesion_fisica}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
+                      <ConditionalField fieldName="marketing_suspended_reason">
+                        {asset.marketing_suspended_reason && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Razón suspensión marketing:</span>
+                            <span className="font-medium">{asset.marketing_suspended_reason}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
+                      <ConditionalField fieldName="campania">
+                        {asset.campania && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Campaña:</span>
+                            <span className="font-medium">{asset.campania}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
+                      <ConditionalField fieldName="portfolio">
+                        {asset.portfolio && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Cartera:</span>
+                            <span className="font-medium">{asset.portfolio}</span>
                           </div>
                         )}
                       </ConditionalField>
@@ -384,92 +471,99 @@ export function AssetDetails({ id }: AssetDetailsProps) {
             </TabsContent>
 
             <TabsContent value="cadastral" className="mt-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="space-y-6">
                   <div>
-                    <h4 className="font-medium">Datos Catastrales</h4>
-                    <div className="mt-2 space-y-2">
-                      <ConditionalField fieldName="provincia_catastro">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Provincia:</span>
-                          <span>{asset.provincia_catastro}</span>
-                        </div>
-                      </ConditionalField>
-
-                      <ConditionalField fieldName="municipio_catastro">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Municipio:</span>
-                          <span>{asset.municipio_catastro}</span>
-                        </div>
-                      </ConditionalField>
-
-                      <ConditionalField fieldName="tipo_via_catastro">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Tipo de vía:</span>
-                          <span>{asset.tipo_via_catastro}</span>
-                        </div>
-                      </ConditionalField>
-
-                      <ConditionalField fieldName="nombre_via_catastro">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Nombre de vía:</span>
-                          <span>{asset.nombre_via_catastro}</span>
-                        </div>
-                      </ConditionalField>
-
-                      <ConditionalField fieldName="numero_portal_catastro">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Número portal:</span>
-                          <span>{asset.numero_portal_catastro}</span>
-                        </div>
-                      </ConditionalField>
+                    <h4 className="font-medium text-lg mb-3">Datos Catastrales Principales</h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between py-1">
+                        <span className="text-muted-foreground">Provincia:</span>
+                        <span className="font-medium">{asset.provincia_catastro}</span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-muted-foreground">Municipio:</span>
+                        <span className="font-medium">{asset.municipio_catastro}</span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-muted-foreground">Tipo de vía:</span>
+                        <span className="font-medium">{asset.tipo_via_catastro}</span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-muted-foreground">Nombre de vía:</span>
+                        <span className="font-medium">{asset.nombre_via_catastro}</span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-muted-foreground">Número portal:</span>
+                        <span className="font-medium">{asset.numero_portal_catastro}</span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-muted-foreground">Código postal:</span>
+                        <span className="font-medium">{asset.codigo_postal_catastro}</span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-muted-foreground">Superficie construida:</span>
+                        <span className="font-medium">{asset.superficie_construida_m2} m²</span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div>
-                    <h4 className="font-medium">Detalles Catastrales</h4>
-                    <div className="mt-2 space-y-2">
+                    <h4 className="font-medium text-lg mb-3">Detalles Catastrales</h4>
+                    <div className="space-y-3">
                       <ConditionalField fieldName="escalera_catastro">
                         {asset.escalera_catastro && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Escalera:</span>
-                            <span>{asset.escalera_catastro}</span>
+                            <span className="font-medium">{asset.escalera_catastro}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="planta_catastro">
                         {asset.planta_catastro && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Planta:</span>
-                            <span>{asset.planta_catastro}</span>
+                            <span className="font-medium">{asset.planta_catastro}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="puerta_catastro">
                         {asset.puerta_catastro && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Puerta:</span>
-                            <span>{asset.puerta_catastro}</span>
+                            <span className="font-medium">{asset.puerta_catastro}</span>
                           </div>
                         )}
                       </ConditionalField>
 
-                      <ConditionalField fieldName="codigo_postal_catastro">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Código postal:</span>
-                          <span>{asset.codigo_postal_catastro}</span>
-                        </div>
+                      <ConditionalField fieldName="parcel">
+                        {asset.parcel && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Parcela:</span>
+                            <span className="font-medium">{asset.parcel}</span>
+                          </div>
+                        )}
                       </ConditionalField>
 
-                      <ConditionalField fieldName="superficie_construida_m2">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Superficie construida:</span>
-                          <span>{asset.superficie_construida_m2} m²</span>
-                        </div>
+                      <ConditionalField fieldName="lien">
+                        {asset.lien && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Lien:</span>
+                            <span className="font-medium">{asset.lien}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
+
+                      <ConditionalField fieldName="alt_id1">
+                        {asset.alt_id1 && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">ID Alternativo:</span>
+                            <span className="font-medium">{asset.alt_id1}</span>
+                          </div>
+                        )}
                       </ConditionalField>
                     </div>
                   </div>
@@ -478,94 +572,112 @@ export function AssetDetails({ id }: AssetDetailsProps) {
             </TabsContent>
 
             <TabsContent value="legal" className="mt-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="space-y-6">
                   <div>
-                    <h4 className="font-medium">Información Legal</h4>
-                    <div className="mt-2 space-y-2">
+                    <h4 className="font-medium text-lg mb-3">Información Legal</h4>
+                    <div className="space-y-3">
                       <ConditionalField fieldName="legal_type">
                         {asset.legal_type && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Tipo legal:</span>
-                            <span>{asset.legal_type}</span>
+                            <span className="font-medium">{asset.legal_type}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="legal_phase">
                         {asset.legal_phase && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Fase legal:</span>
-                            <span>{legalPhase}</span>
+                            <span className="font-medium">{legalPhase}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="tipo_procedimiento">
                         {asset.tipo_procedimiento && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Tipo de procedimiento:</span>
-                            <span>{asset.tipo_procedimiento}</span>
+                            <span className="font-medium">{asset.tipo_procedimiento}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="fase_procedimiento">
                         {asset.fase_procedimiento && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Fase de procedimiento:</span>
-                            <span>{asset.fase_procedimiento}</span>
+                            <span className="font-medium">{asset.fase_procedimiento}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="fase_actual">
                         {asset.fase_actual && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Fase actual:</span>
-                            <span>{asset.fase_actual}</span>
+                            <span className="font-medium">{asset.fase_actual}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
+
+                      <ConditionalField fieldName="hip_under_re_mgmt">
+                        {asset.hip_under_re_mgmt && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Hipoteca bajo gestión:</span>
+                            <span className="font-medium">{asset.hip_under_re_mgmt}</span>
                           </div>
                         )}
                       </ConditionalField>
                     </div>
                   </div>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div>
-                    <h4 className="font-medium">Fechas Importantes</h4>
-                    <div className="mt-2 space-y-2">
+                    <h4 className="font-medium text-lg mb-3">Fechas Importantes</h4>
+                    <div className="space-y-3">
                       <ConditionalField fieldName="closing_date">
                         {asset.closing_date && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Fecha de cierre:</span>
-                            <span>{formatDate(asset.closing_date)}</span>
+                            <span className="font-medium">{formatDate(asset.closing_date)}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="portfolio_closing_date">
                         {asset.portfolio_closing_date && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Fecha de cierre de cartera:</span>
-                            <span>{formatDate(asset.portfolio_closing_date)}</span>
+                            <span className="font-medium">{formatDate(asset.portfolio_closing_date)}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
+
+                      <ConditionalField fieldName="date_under_re_mgmt">
+                        {asset.date_under_re_mgmt && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Fecha bajo gestión:</span>
+                            <span className="font-medium">{formatDate(asset.date_under_re_mgmt)}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="fecha_subasta">
                         {asset.fecha_subasta && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Fecha de subasta:</span>
-                            <span>{formatDate(asset.fecha_subasta)}</span>
+                            <span className="font-medium">{formatDate(asset.fecha_subasta)}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="fecha_cesion_remate">
                         {asset.fecha_cesion_remate && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Fecha de cesión de remate:</span>
-                            <span>{formatDate(asset.fecha_cesion_remate)}</span>
+                            <span className="font-medium">{formatDate(asset.fecha_cesion_remate)}</span>
                           </div>
                         )}
                       </ConditionalField>
@@ -576,112 +688,148 @@ export function AssetDetails({ id }: AssetDetailsProps) {
             </TabsContent>
 
             <TabsContent value="financial" className="mt-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="space-y-6">
                   <div>
-                    <h4 className="font-medium">Información Financiera</h4>
-                    <div className="mt-2 space-y-2">
+                    <h4 className="font-medium text-lg mb-3">Información Financiera Principal</h4>
+                    <div className="space-y-3">
                       <ConditionalField fieldName="price_approx">
                         {asset.price_approx && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Precio aproximado:</span>
-                            <span>{formatCurrency(asset.price_approx)}</span>
+                            <span className="font-medium">{formatCurrency(asset.price_approx)}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="price_to_brokers">
                         {asset.price_to_brokers && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Precio para intermediarios:</span>
-                            <span>{formatCurrency(asset.price_to_brokers)}</span>
+                            <span className="font-medium">{formatCurrency(asset.price_to_brokers)}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="auction_base">
                         {asset.auction_base && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Base de subasta:</span>
-                            <span>{formatCurrency(asset.auction_base)}</span>
+                            <span className="font-medium">{formatCurrency(asset.auction_base)}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="auction_value">
                         {asset.auction_value && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Valor de subasta:</span>
-                            <span>{formatCurrency(asset.auction_value)}</span>
+                            <span className="font-medium">{formatCurrency(asset.auction_value)}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="gbv">
                         {asset.gbv && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Valor bruto (GBV):</span>
-                            <span>{formatCurrency(asset.gbv)}</span>
+                            <span className="font-medium">{formatCurrency(asset.gbv)}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="hv">
                         {asset.hv && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Valor hipotecario:</span>
-                            <span>{formatCurrency(asset.hv)}</span>
+                            <span className="font-medium">{formatCurrency(asset.hv)}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="purchase_price">
                         {asset.purchase_price && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Precio de compra:</span>
-                            <span>{formatCurrency(asset.purchase_price)}</span>
+                            <span className="font-medium">{formatCurrency(asset.purchase_price)}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
+
+                      <ConditionalField fieldName="uw_value">
+                        {asset.uw_value && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Valor UW:</span>
+                            <span className="font-medium">{formatCurrency(asset.uw_value)}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
+
+                      <ConditionalField fieldName="hipoges_value_total">
+                        {asset.hipoges_value_total && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Valor total Hipoges:</span>
+                            <span className="font-medium">{formatCurrency(asset.hipoges_value_total)}</span>
                           </div>
                         )}
                       </ConditionalField>
                     </div>
                   </div>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div>
-                    <h4 className="font-medium">Deuda</h4>
-                    <div className="mt-2 space-y-2">
+                    <h4 className="font-medium text-lg mb-3">Información de Deuda</h4>
+                    <div className="space-y-3">
                       <ConditionalField fieldName="deuda">
                         {asset.deuda && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Deuda:</span>
-                            <span>{formatCurrency(asset.deuda)}</span>
+                            <span className="font-medium">{formatCurrency(asset.deuda)}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="DEUDA">
                         {asset.DEUDA && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Deuda (Alt):</span>
-                            <span>{formatCurrency(asset.DEUDA)}</span>
+                            <span className="font-medium">{formatCurrency(asset.DEUDA)}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="ob">
                         {asset.ob && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">OB:</span>
-                            <span>{formatCurrency(asset.ob)}</span>
+                            <span className="font-medium">{formatCurrency(asset.ob)}</span>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="borrower_name">
                         {asset.borrower_name && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between py-1">
                             <span className="text-muted-foreground">Nombre del prestatario:</span>
-                            <span>{asset.borrower_name}</span>
+                            <span className="font-medium">{asset.borrower_name}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
+
+                      <ConditionalField fieldName="reference_code_1">
+                        {asset.reference_code_1 && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">Código de referencia 1:</span>
+                            <span className="font-medium">{asset.reference_code_1}</span>
+                          </div>
+                        )}
+                      </ConditionalField>
+
+                      <ConditionalField fieldName="id_portal_subasta">
+                        {asset.id_portal_subasta && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-muted-foreground">ID Portal Subasta:</span>
+                            <span className="font-medium">{asset.id_portal_subasta}</span>
                           </div>
                         )}
                       </ConditionalField>
@@ -692,77 +840,121 @@ export function AssetDetails({ id }: AssetDetailsProps) {
             </TabsContent>
 
             <TabsContent value="market" className="mt-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="space-y-6">
                   <div>
-                    <h4 className="font-medium flex items-center gap-2">
+                    <h4 className="font-medium text-lg mb-3 flex items-center gap-2">
                       <TrendingUp className="h-5 w-5" />
                       Datos de Mercado
                     </h4>
-                    <div className="mt-2 space-y-2">
+                    <div className="space-y-4">
                       <ConditionalField fieldName="precio_idealista_venta_m2">
                         {asset.precio_idealista_venta_m2 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Precio venta m²:</span>
-                            <span className="font-medium">{formatCurrency(asset.precio_idealista_venta_m2)}</span>
+                          <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Euro className="h-4 w-4 text-green-600" />
+                              <span className="text-sm font-medium text-green-800">Precio venta m²</span>
+                            </div>
+                            <p className="text-2xl font-bold text-green-700">
+                              {formatCurrency(asset.precio_idealista_venta_m2)}
+                            </p>
                           </div>
                         )}
                       </ConditionalField>
 
                       <ConditionalField fieldName="precio_idealista_alquiler_m2">
                         {asset.precio_idealista_alquiler_m2 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Precio alquiler m²:</span>
-                            <span className="font-medium">{formatCurrency(asset.precio_idealista_alquiler_m2)}</span>
+                          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Euro className="h-4 w-4 text-blue-600" />
+                              <span className="text-sm font-medium text-blue-800">Precio alquiler m²</span>
+                            </div>
+                            <p className="text-2xl font-bold text-blue-700">
+                              {formatCurrency(asset.precio_idealista_alquiler_m2)}
+                            </p>
                           </div>
                         )}
                       </ConditionalField>
 
-                      {marketValue > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Valor mercado:</span>
-                          <span className="font-medium text-green-600">{formatCurrency(marketValue)}</span>
-                        </div>
-                      )}
-
-                      {rentalMarketValue > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Valor de alquiler mercado:</span>
-                          <span className="font-medium text-blue-600">{formatCurrency(rentalMarketValue)}</span>
+                      {propertySalePrice > 0 && superficie > 0 && (
+                        <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Calculator className="h-4 w-4 text-purple-600" />
+                            <span className="text-sm font-medium text-purple-800">Precio venta del inmueble</span>
+                          </div>
+                          <p className="text-lg font-bold text-purple-700">{formatCurrency(propertySalePrice)}</p>
+                          <p className="text-xs text-purple-600 mt-1">
+                            {superficie}m² × {formatCurrency(propertySalePrice / superficie)}/m²
+                          </p>
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div>
-                    <h4 className="font-medium">Análisis de Rentabilidad</h4>
-                    <div className="mt-2 space-y-2">
-                      {asset.price_approx && marketValue > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Diferencia con mercado:</span>
-                          <span className={marketValue - asset.price_approx > 0 ? "text-green-600" : "text-red-600"}>
-                            {formatCurrency(marketValue - asset.price_approx)}
-                          </span>
+                    <h4 className="font-medium text-lg mb-3 flex items-center gap-2">
+                      <Calculator className="h-5 w-5" />
+                      Valores Calculados
+                    </h4>
+                    <div className="space-y-4">
+                      {marketValue > 0 && (
+                        <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <TrendingUp className="h-4 w-4 text-emerald-600" />
+                            <span className="text-sm font-medium text-emerald-800">Valor actual en el mercado</span>
+                          </div>
+                          <p className="text-2xl font-bold text-emerald-700">{formatCurrency(marketValue)}</p>
+                          <p className="text-xs text-emerald-600 mt-1">
+                            {superficie}m² × {formatCurrency(asset.precio_idealista_venta_m2 || 0)}/m²
+                          </p>
+                        </div>
+                      )}
+
+                      {rentalMarketValue > 0 && (
+                        <div className="p-4 bg-cyan-50 rounded-lg border border-cyan-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Home className="h-4 w-4 text-cyan-600" />
+                            <span className="text-sm font-medium text-cyan-800">Valor de alquiler en el mercado</span>
+                          </div>
+                          <p className="text-2xl font-bold text-cyan-700">{formatCurrency(rentalMarketValue)}</p>
+                          <p className="text-xs text-cyan-600 mt-1">
+                            {superficie}m² × {formatCurrency(asset.precio_idealista_alquiler_m2 || 0)}/m² (mensual)
+                          </p>
                         </div>
                       )}
 
                       {asset.price_approx && marketValue > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Descuento sobre mercado:</span>
-                          <span className="font-medium">
-                            {Math.round((1 - asset.price_approx / marketValue) * 100)}%
-                          </span>
-                        </div>
-                      )}
-
-                      {asset.price_approx && rentalMarketValue > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Rentabilidad bruta anual:</span>
-                          <span className="font-medium text-green-600">
-                            {Math.round(((rentalMarketValue * 12) / asset.price_approx) * 100)}%
-                          </span>
+                        <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Calculator className="h-4 w-4 text-orange-600" />
+                            <span className="text-sm font-medium text-orange-800">Análisis de Rentabilidad</span>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-sm text-orange-700">Diferencia con mercado:</span>
+                              <span
+                                className={`font-medium ${marketValue - asset.price_approx > 0 ? "text-green-600" : "text-red-600"}`}
+                              >
+                                {formatCurrency(marketValue - asset.price_approx)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-orange-700">Descuento sobre mercado:</span>
+                              <span className="font-medium text-orange-800">
+                                {Math.round((1 - asset.price_approx / marketValue) * 100)}%
+                              </span>
+                            </div>
+                            {rentalMarketValue > 0 && (
+                              <div className="flex justify-between">
+                                <span className="text-sm text-orange-700">Rentabilidad bruta anual:</span>
+                                <span className="font-medium text-green-600">
+                                  {Math.round(((rentalMarketValue * 12) / asset.price_approx) * 100)}%
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -794,7 +986,7 @@ export function AssetDetails({ id }: AssetDetailsProps) {
 
             <div className="flex justify-between">
               <span className="text-muted-foreground">Superficie</span>
-              <span className="font-medium">{asset.superficie_construida_m2 || "N/A"} m²</span>
+              <span className="font-medium">{superficie} m²</span>
             </div>
 
             <RestrictedValue
@@ -846,11 +1038,11 @@ export function AssetDetails({ id }: AssetDetailsProps) {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Municipio</span>
-              <span className="font-medium">{asset.municipio_catastro || "N/A"}</span>
+              <span className="font-medium">{asset.municipio_catastro}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Provincia</span>
-              <span className="font-medium">{asset.provincia_catastro || "N/A"}</span>
+              <span className="font-medium">{asset.provincia_catastro}</span>
             </div>
             <ConditionalField fieldName="codigo_postal_catastro">
               {asset.codigo_postal_catastro && (

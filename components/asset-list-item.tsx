@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card"
 import { ConditionalField } from "@/components/permissions/conditional-field"
 import { RestrictedValue } from "@/components/permissions/restricted-value"
 import type { Asset } from "@/types/asset"
-import { formatCurrency, marketingStatusLabels, propertyTypeLabels } from "@/types/asset"
+import { formatCurrency, marketingStatusLabels, propertyTypeLabels, getFullAddress, getSuperficie } from "@/types/asset"
 
 // Dynamically import the map component with no SSR
 const PostalCodeMap = dynamic(() => import("./maps/postal-code-map"), {
@@ -30,17 +30,19 @@ export function AssetListItem({ asset }: AssetListItemProps) {
   const propertyType = propertyTypeLabels[asset.property_type] || asset.property_type
   const marketingStatus =
     marketingStatusLabels[asset.marketing_status || "AVAILABLE"] || asset.marketing_status || "Disponible"
+  const fullAddress = getFullAddress(asset)
+  const superficie = getSuperficie(asset)
 
   return (
     <Card className="overflow-hidden">
       <div className="flex flex-col md:flex-row">
         <div className="relative h-48 md:h-auto md:w-1/3 md:max-w-xs">
           {/* Map area */}
-          <ConditionalField fieldName="zip_code">
-            {asset.zip_code ? (
+          <ConditionalField fieldName="codigo_postal_catastro">
+            {asset.codigo_postal_catastro ? (
               <RestrictedValue
-                fieldName="zip_code"
-                value={<PostalCodeMap postalCode={asset.zip_code} />}
+                fieldName="codigo_postal_catastro"
+                value={<PostalCodeMap postalCode={asset.codigo_postal_catastro} />}
                 fallback={
                   <div className="flex items-center justify-center h-full w-full bg-muted">
                     <p className="text-muted-foreground">Mapa restringido</p>
@@ -65,10 +67,12 @@ export function AssetListItem({ asset }: AssetListItemProps) {
         <div className="flex flex-col flex-grow p-4">
           <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-2">
             <div>
-              <h3 className="text-xl font-semibold">{asset.title || `${propertyType} en ${asset.city}`}</h3>
+              <h3 className="text-xl font-semibold">
+                {asset.title || `${propertyType} en ${asset.municipio_catastro}`}
+              </h3>
               <div className="mt-1 flex items-center text-sm text-muted-foreground">
                 <MapPin className="mr-1 h-4 w-4" />
-                {asset.address}, {asset.city}, {asset.province}
+                {fullAddress}, {asset.municipio_catastro}, {asset.provincia_catastro}
               </div>
               <ConditionalField fieldName="reference_code">
                 {asset.reference_code && (
@@ -84,7 +88,7 @@ export function AssetListItem({ asset }: AssetListItemProps) {
 
           <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
             {asset.description ||
-              `${propertyType} ubicado en ${asset.address}, ${asset.city}, ${asset.province}. ${asset.sqm}m².`}
+              `${propertyType} ubicado en ${fullAddress}, ${asset.municipio_catastro}, ${asset.provincia_catastro}. ${superficie}m².`}
           </p>
 
           <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -92,11 +96,11 @@ export function AssetListItem({ asset }: AssetListItemProps) {
               <Ruler className="h-4 w-4 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">Superficie</p>
-                <p className="text-sm font-medium">{asset.sqm} m²</p>
+                <p className="text-sm font-medium">{superficie} m²</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {asset.property_type === "RESIDENTIAL" ? (
+              {asset.property_type === "RESIDENTIAL" || asset.property_type === "Vivienda" ? (
                 <Home className="h-4 w-4 text-muted-foreground" />
               ) : (
                 <Building className="h-4 w-4 text-muted-foreground" />
@@ -106,13 +110,13 @@ export function AssetListItem({ asset }: AssetListItemProps) {
                 <p className="text-sm font-medium">{propertyType}</p>
               </div>
             </div>
-            <ConditionalField fieldName="year">
-              {asset.year && (
+            <ConditionalField fieldName="ano_construccion_inmueble">
+              {asset.ano_construccion_inmueble && asset.ano_construccion_inmueble !== "0" && (
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-xs text-muted-foreground">Año</p>
-                    <p className="text-sm font-medium">{asset.year || "N/A"}</p>
+                    <p className="text-sm font-medium">{asset.ano_construccion_inmueble}</p>
                   </div>
                 </div>
               )}

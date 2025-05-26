@@ -1,67 +1,68 @@
 import type { Asset } from "@/types/asset"
-import { sampleAssets } from "./firestore"
 import { normalizeText } from "./utils"
 import { searchProperties } from "@/lib/firestore/property-service"
 
-// This is a client-side search implementation
-// For a production app with large datasets, consider using:
-// 1. Firestore queries with composite indexes
-// 2. Algolia or similar search service integrated with Firestore
-// 3. Server-side search implementation with proper pagination
+// Cache para sugerencias de búsqueda
+const suggestionsCache = new Map<string, { suggestions: string[]; timestamp: number }>()
+const CACHE_EXPIRY = 2 * 60 * 1000 // 2 minutos
 
-// Search assets by any field
+// Search assets by any field using cadastral data
 export async function searchAssets(query: string): Promise<Asset[]> {
   // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 300))
+  await new Promise((resolve) => setTimeout(resolve, 200))
 
-  if (!query.trim()) {
-    return []
-  }
-
-  const normalizedQuery = normalizeText(query)
-
-  // Search across all text fields
-  return sampleAssets.filter((asset) => {
-    return (
-      normalizeText(asset.title).includes(normalizedQuery) ||
-      normalizeText(asset.description).includes(normalizedQuery) ||
-      normalizeText(asset.location).includes(normalizedQuery) ||
-      normalizeText(asset.type).includes(normalizedQuery) ||
-      normalizeText(asset.status).includes(normalizedQuery) ||
-      normalizeText(asset.owner).includes(normalizedQuery) ||
-      // Search in numeric fields by converting to string
-      asset.price
-        .toString()
-        .includes(normalizedQuery) ||
-      asset.area.toString().includes(normalizedQuery) ||
-      asset.year.toString().includes(normalizedQuery)
-    )
-  })
-}
-
-// Get search suggestions based on partial input
-export async function getSearchSuggestions(query: string): Promise<string[]> {
   if (!query.trim()) {
     return []
   }
 
   try {
+    // Use the property service search function
+    return await searchProperties(query)
+  } catch (error) {
+    console.error("Error searching assets:", error)
+    return []
+  }
+}
+
+// Get search suggestions based on partial input with caching
+export async function getSearchSuggestions(query: string): Promise<string[]> {
+  if (!query.trim() || query.length < 2) {
+    return []
+  }
+
+  const normalizedQuery = normalizeText(query)
+
+  // Check cache first
+  const cached = suggestionsCache.get(normalizedQuery)
+  if (cached && Date.now() - cached.timestamp < CACHE_EXPIRY) {
+    return cached.suggestions
+  }
+
+  try {
     // Get properties that match the query
     const properties = await searchProperties(query)
-
-    const normalizedQuery = normalizeText(query)
     const suggestions = new Set<string>()
 
-    // Extract suggestions from various fields
+    // Extract suggestions from various cadastral fields
     properties.forEach((property) => {
-      // Add location suggestions
-      if (property.city && normalizeText(property.city).includes(normalizedQuery)) {
-        suggestions.add(property.city)
+      // Add provincia suggestions
+      if (property.provincia_catastro && normalizeText(property.provincia_catastro).includes(normalizedQuery)) {
+        suggestions.add(property.provincia_catastro)
       }
 
-      // Add province suggestions
-      if (property.province && normalizeText(property.province).includes(normalizedQuery)) {
-        suggestions.add(property.province)
+      // Add municipio suggestions
+      if (property.municipio_catastro && normalizeText(property.municipio_catastro).includes(normalizedQuery)) {
+        suggestions.add(property.municipio_catastro)
+      }
+
+      // Add tipo_via suggestions
+      if (property.tipo_via_catastro && normalizeText(property.tipo_via_catastro).includes(normalizedQuery)) {
+        suggestions.add(property.tipo_via_catastro)
+      }
+
+      // Add nombre_via suggestions
+      if (property.nombre_via_catastro && normalizeText(property.nombre_via_catastro).includes(normalizedQuery)) {
+        suggestions.add(property.nombre_via_catastro)
       }
 
       // Add property type suggestions
@@ -74,22 +75,33 @@ export async function getSearchSuggestions(query: string): Promise<string[]> {
         suggestions.add(property.reference_code)
       }
 
-      // Add title word suggestions if title exists
-      if (property.title) {
-        property.title.split(" ").forEach((word) => {
-          if (normalizeText(word).includes(normalizedQuery) && word.length > 3) {
-            suggestions.add(word)
-          }
-        })
+      // Add codigo_postal suggestions
+      if (property.codigo_postal_catastro && property.codigo_postal_catastro.includes(query)) {
+        suggestions.add(property.codigo_postal_catastro)
+      }
+
+      // Add numero_portal suggestions for exact matches
+      if (property.numero_portal_catastro && property.numero_portal_catastro.includes(query)) {
+        suggestions.add(`${property.numero_portal_catastro} ${property.nombre_via_catastro || ""}`.trim())
       }
     })
 
-    return Array.from(suggestions).slice(0, 5)
+    const result = Array.from(suggestions).slice(0, 8).sort()
+
+    // Cache the results
+    suggestionsCache.set(normalizedQuery, {
+      suggestions: result,
+      timestamp: Date.now(),
+    })
+
+    return result
   } catch (error) {
     console.error("Error getting search suggestions:", error)
     return []
   }
 }
 
-// Export the sample assets to make them available for modification
-export { sampleAssets }
+// Clear suggestions cache
+export function clearSuggestionsCache(): void {
+  suggestionsCache.clear()
+}

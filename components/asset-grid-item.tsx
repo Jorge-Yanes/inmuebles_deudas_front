@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ConditionalField } from "@/components/permissions/conditional-field"
 import { RestrictedValue } from "@/components/permissions/restricted-value"
 import type { Asset } from "@/types/asset"
-import { marketingStatusLabels, propertyTypeLabels } from "@/types/asset"
+import { marketingStatusLabels, propertyTypeLabels, getSuperficie } from "@/types/asset"
 
 // Dynamically import the map component with no SSR
 const PostalCodeMap = dynamic(() => import("./maps/postal-code-map"), {
@@ -28,6 +28,7 @@ export function AssetGridItem({ asset }: AssetGridItemProps) {
   const propertyType = propertyTypeLabels[asset.property_type] || asset.property_type
   const marketingStatus =
     marketingStatusLabels[asset.marketing_status || "AVAILABLE"] || asset.marketing_status || "Disponible"
+  const superficie = getSuperficie(asset)
 
   // Determine if this is an NPL (Non-Performing Loan) property
   const isNPL = asset.legal_type === "NPL" || asset.legal_phase === "FORECLOSURE"
@@ -37,11 +38,11 @@ export function AssetGridItem({ asset }: AssetGridItemProps) {
       <Card className="h-full overflow-hidden hover:shadow-md transition-shadow">
         <div className="relative h-40">
           {/* Map area */}
-          <ConditionalField fieldName="zip_code">
-            {asset.zip_code ? (
+          <ConditionalField fieldName="codigo_postal_catastro">
+            {asset.codigo_postal_catastro ? (
               <RestrictedValue
-                fieldName="zip_code"
-                value={<PostalCodeMap postalCode={asset.zip_code} />}
+                fieldName="codigo_postal_catastro"
+                value={<PostalCodeMap postalCode={asset.codigo_postal_catastro} />}
                 fallback={
                   <div className="flex items-center justify-center h-full w-full bg-muted">
                     <p className="text-muted-foreground">Mapa restringido</p>
@@ -72,7 +73,7 @@ export function AssetGridItem({ asset }: AssetGridItemProps) {
             <span className="font-medium">{propertyType}</span>
             <span className="mx-1">en</span>
             <span>
-              {asset.city}, {asset.province}
+              {asset.municipio_catastro}, {asset.provincia_catastro}
             </span>
           </div>
           <div className="mt-4 flex items-center gap-2">
@@ -92,7 +93,7 @@ export function AssetGridItem({ asset }: AssetGridItemProps) {
                 <path d="M3 3v18h18" />
                 <path d="M3 15L8 9l4 2 5-5" />
               </svg>
-              <span>{asset.sqm} m²</span>
+              <span>{superficie} m²</span>
             </div>
           </div>
         </CardContent>
