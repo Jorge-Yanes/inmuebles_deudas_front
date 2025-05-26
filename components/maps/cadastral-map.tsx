@@ -3,14 +3,17 @@
 import { useState, useEffect } from "react"
 import { useAuth } from "@/context/auth-context"
 import { MapTypeSelector, type MapType } from "./map-type-selector"
+import { generateMapUrl, getCadastralMapUrl, getLocationForMap } from "@/lib/utils"
+import type { Asset } from "@/types/asset"
 
 interface CadastralMapProps {
-  reference: string
+  asset?: Asset
+  reference?: string
   postalCode?: string
   height?: string | number
 }
 
-export default function CadastralMap({ reference, postalCode, height = "100%" }: CadastralMapProps) {
+export default function CadastralMap({ asset, reference, postalCode, height = "100%" }: CadastralMapProps) {
   const { user } = useAuth()
   const [error, setError] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -18,26 +21,36 @@ export default function CadastralMap({ reference, postalCode, height = "100%" }:
   const [mapType, setMapType] = useState<MapType>("cadastral")
 
   const mapStyle = typeof height === "number" ? { height: `${height}px` } : { height }
-  const hasCadastralData = !!reference
+
+  // Obtener datos de ubicación del asset o parámetros
+  const locationData = asset
+    ? getLocationForMap(asset)
+    : {
+        address: "",
+        postalCode: postalCode || "",
+        city: "",
+        province: "",
+        fullLocation: postalCode ? `${postalCode}, España` : "",
+      }
+
+  const cadastralRef = asset?.cadastral_reference || reference || ""
+  const hasCadastralData = !!cadastralRef
+  const hasLocationData = !!(locationData.fullLocation || locationData.postalCode)
 
   useEffect(() => {
-    if (!postalCode && mapType === "standard") {
+    if (mapType === "standard" && !hasLocationData) {
       setError(true)
       setLoading(false)
       return
     }
 
-    if (mapType === "standard" && postalCode) {
+    if (mapType === "standard" && hasLocationData) {
       setLoading(true)
       setError(false)
 
-      // For OpenStreetMap, we'll use a direct iframe to their map
-      const encodedQuery = encodeURIComponent(`${postalCode}, Spain`)
-      const url = `https://www.openstreetmap.org/export/embed.html?bbox=-10.0,35.0,5.0,44.0&layer=mapnik&marker=40.416775,-3.70379&query=${encodedQuery}`
-
+      const url = generateMapUrl(locationData.fullLocation)
       setMapUrl(url)
 
-      // Simulate loading delay
       const timer = setTimeout(() => {
         setLoading(false)
       }, 500)
@@ -46,19 +59,22 @@ export default function CadastralMap({ reference, postalCode, height = "100%" }:
     }
 
     setLoading(false)
-  }, [postalCode, mapType])
+  }, [mapType, locationData.fullLocation, hasLocationData])
 
-  // For non-admin users, always show standard map if postal code is available
+  // Para usuarios no admin, mostrar mapa estándar si hay datos de ubicación
   useEffect(() => {
-    if (user?.role !== "admin" && postalCode) {
+    if (user?.role !== "admin" && hasLocationData) {
       setMapType("standard")
     }
-  }, [user, postalCode])
+  }, [user, hasLocationData])
 
-  if (!reference && !postalCode) {
+  if (!hasCadastralData && !hasLocationData) {
     return (
       <div className="flex items-center justify-center h-full w-full bg-muted" style={mapStyle}>
-        <p className="text-muted-foreground">No hay datos de ubicación disponibles</p>
+        <div className="text-center">
+          <p className="text-muted-foreground">No hay datos de ubicación disponibles</p>
+          <p className="text-sm text-muted-foreground mt-1">Se requiere referencia catastral o código postal</p>
+        </div>
       </div>
     )
   }
@@ -66,13 +82,18 @@ export default function CadastralMap({ reference, postalCode, height = "100%" }:
   if (loading && mapType === "standard") {
     return (
       <div className="flex items-center justify-center h-full w-full bg-muted" style={mapStyle}>
-        <p className="text-muted-foreground">Cargando mapa...</p>
+        <div className="text-center">
+          <p className="text-muted-foreground">Cargando mapa...</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {locationData.city && `${locationData.city}, ${locationData.province}`}
+          </p>
+        </div>
       </div>
     )
   }
 
-  // For non-admin users or when standard map is selected
-  if (mapType === "standard" && postalCode) {
+  // Mostrar mapa estándar para usuarios no admin o cuando se selecciona
+  if (mapType === "standard" && hasLocationData) {
     return (
       <div className="relative w-full overflow-hidden rounded-md" style={mapStyle}>
         <MapTypeSelector onChange={setMapType} currentType={mapType} hasCadastralData={hasCadastralData} />
@@ -86,36 +107,59 @@ export default function CadastralMap({ reference, postalCode, height = "100%" }:
           allowFullScreen
           aria-hidden="false"
           tabIndex={0}
-          title={`Mapa de ${postalCode}`}
+          title={`Mapa de ubicación - ${locationData.city || locationData.postalCode}`}
           loading="lazy"
           onError={() => setError(true)}
         />
+
+        {/* Información de ubicación */}
+        <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm rounded px-2 py-1 text-xs text-gray-700 max-w-[250px]">
+          {locationData.address && <div className="font-medium truncate">{locationData.address}</div>}
+          <div className="truncate">
+            {locationData.city && `${locationData.city}, `}
+            {locationData.province}
+            {locationData.postalCode && ` (${locationData.postalCode})`}
+          </div>
+        </div>
       </div>
     )
   }
 
-  // Default to cadastral map for admins or when no postal code is available
+  // Mapa catastral por defecto para admins
   return (
     <div className="relative w-full overflow-hidden rounded-md" style={mapStyle}>
       <MapTypeSelector onChange={setMapType} currentType={mapType} hasCadastralData={hasCadastralData} />
 
-      {!error ? (
-        <iframe
-          src={`https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?refcat=${reference}`}
-          width="100%"
-          height="100%"
-          frameBorder="0"
-          style={{ border: 0 }}
-          allowFullScreen
-          aria-hidden="false"
-          tabIndex={0}
-          title={`Mapa catastral de referencia ${reference}`}
-          loading="lazy"
-          onError={() => setError(true)}
-        />
+      {!error && hasCadastralData ? (
+        <>
+          <iframe
+            src={getCadastralMapUrl(cadastralRef)}
+            width="100%"
+            height="100%"
+            frameBorder="0"
+            style={{ border: 0 }}
+            allowFullScreen
+            aria-hidden="false"
+            tabIndex={0}
+            title={`Mapa catastral - ${cadastralRef}`}
+            loading="lazy"
+            onError={() => setError(true)}
+          />
+
+          {/* Información catastral */}
+          <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm rounded px-2 py-1 text-xs text-gray-700">
+            <div className="font-medium">Ref. Catastral</div>
+            <div className="font-mono">{cadastralRef}</div>
+          </div>
+        </>
       ) : (
         <div className="flex items-center justify-center h-full w-full bg-muted">
-          <p className="text-muted-foreground">No se pudo cargar el mapa catastral</p>
+          <div className="text-center">
+            <p className="text-muted-foreground">
+              {error ? "No se pudo cargar el mapa catastral" : "Referencia catastral no disponible"}
+            </p>
+            {cadastralRef && <p className="text-sm text-muted-foreground mt-1 font-mono">{cadastralRef}</p>}
+          </div>
         </div>
       )}
     </div>

@@ -58,64 +58,121 @@ export function generateDescription(asset: Asset): string {
 
 // Función para obtener la dirección completa usando SOLO campos catastrales
 export function getFullAddress(asset: Asset): string {
-  const components = []
+  const parts: string[] = []
 
-  // Construir dirección usando solo datos catastrales
+  // Construir dirección usando campos catastrales
   if (asset.tipo_via_catastro && asset.nombre_via_catastro) {
-    components.push(`${asset.tipo_via_catastro} ${asset.nombre_via_catastro}`)
+    let address = `${asset.tipo_via_catastro} ${asset.nombre_via_catastro}`
+
+    if (asset.numero_portal_catastro) {
+      address += ` ${asset.numero_portal_catastro}`
+    }
+
+    parts.push(address)
   }
 
-  if (asset.numero_portal_catastro) {
-    components.push(asset.numero_portal_catastro)
+  // Añadir detalles adicionales si existen
+  const details: string[] = []
+  if (asset.escalera_catastro) details.push(`Esc. ${asset.escalera_catastro}`)
+  if (asset.planta_catastro) details.push(`Planta ${asset.planta_catastro}`)
+  if (asset.puerta_catastro) details.push(`Puerta ${asset.puerta_catastro}`)
+
+  if (details.length > 0) {
+    parts.push(details.join(", "))
   }
 
-  if (asset.escalera_catastro) {
-    components.push(`Esc. ${asset.escalera_catastro}`)
-  }
-
-  if (asset.planta_catastro) {
-    components.push(`Planta ${asset.planta_catastro}`)
-  }
-
-  if (asset.puerta_catastro) {
-    components.push(`Puerta ${asset.puerta_catastro}`)
-  }
-
-  if (components.length > 0) {
-    return components.join(", ")
-  }
-
-  // Si no hay suficiente información, devolvemos un mensaje genérico
-  return "Dirección no disponible"
+  return parts.join(", ") || "Dirección no disponible"
 }
 
 // Función para formatear valores monetarios en euros
-export function formatCurrency(value?: number): string {
-  if (value === undefined || value === null) return "N/A"
+export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("es-ES", {
     style: "currency",
     currency: "EUR",
+    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(value)
+  }).format(amount)
+}
+
+export function formatNumber(num: number): string {
+  return new Intl.NumberFormat("es-ES").format(num)
+}
+
+export function formatDate(date: Date): string {
+  return new Intl.DateTimeFormat("es-ES", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(date)
+}
+
+export function getPropertyType(asset: Asset): string {
+  if (asset.tipo_inmueble) return asset.tipo_inmueble
+  if (asset.property_type) return asset.property_type
+  return "Inmueble"
 }
 
 // Función para obtener la superficie como número
-export function getSuperficie(asset: Asset): number {
-  if (!asset.superficie_construida_m2) return 0
-  const superficie = Number.parseFloat(asset.superficie_construida_m2.toString())
-  return isNaN(superficie) ? 0 : superficie
+export function getSuperficie(asset: Asset): string {
+  if (asset.superficie_construida_m2) {
+    return `${asset.superficie_construida_m2}`
+  }
+  if (asset.surface_area) {
+    return `${asset.surface_area}`
+  }
+  return "N/A"
 }
 
 // Función para calcular el valor de mercado
 export function calculateMarketValue(asset: Asset): number {
-  const superficie = getSuperficie(asset)
+  const superficie = Number.parseFloat(getSuperficie(asset))
   if (!superficie || !asset.precio_idealista_venta_m2) return 0
   return superficie * asset.precio_idealista_venta_m2
 }
 
 // Función para calcular el valor de alquiler de mercado
 export function calculateRentalMarketValue(asset: Asset): number {
-  const superficie = getSuperficie(asset)
+  const superficie = Number.parseFloat(getSuperficie(asset))
   if (!superficie || !asset.precio_idealista_alquiler_m2) return 0
   return superficie * asset.precio_idealista_alquiler_m2
+}
+
+export function getLocationForMap(asset: Asset): {
+  address: string
+  postalCode: string
+  city: string
+  province: string
+  fullLocation: string
+} {
+  const address = getFullAddress(asset)
+  const postalCode = asset.codigo_postal_catastro || asset.zip_code || ""
+  const city = asset.municipio_catastro || asset.city || ""
+  const province = asset.provincia_catastro || asset.province || ""
+
+  // Construir ubicación completa para búsqueda en mapa
+  const locationParts = [address, city, province, "España"].filter(Boolean)
+  const fullLocation = locationParts.join(", ")
+
+  return {
+    address,
+    postalCode,
+    city,
+    province,
+    fullLocation,
+  }
+}
+
+export function generateMapUrl(location: string, mapType: "osm" | "google" = "osm"): string {
+  const encodedLocation = encodeURIComponent(location)
+
+  if (mapType === "google") {
+    return `https://maps.google.com/maps?q=${encodedLocation}&output=embed`
+  }
+
+  // OpenStreetMap por defecto
+  return `https://www.openstreetmap.org/export/embed.html?bbox=-10.0,35.0,5.0,44.0&layer=mapnik&marker=40.416775,-3.70379&query=${encodedLocation}`
+}
+
+export function getCadastralMapUrl(reference: string): string {
+  return `https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?refcat=${reference}`
 }
