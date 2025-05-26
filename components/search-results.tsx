@@ -10,7 +10,7 @@ import { getFilteredProperties, getAllProperties } from "@/lib/firestore/propert
 import type { Asset } from "@/types/asset"
 import { AssetGridItem } from "@/components/asset-grid-item"
 import AssetMap from "@/components/maps/asset-map"
-import { normalizeText } from "@/lib/utils"
+import { searchAssets } from "@/lib/search"
 
 interface SearchResultsProps {
   query: string
@@ -36,46 +36,126 @@ export function SearchResults({ query, view = "list", searchParams = {} }: Searc
       try {
         let results: Asset[] = []
 
-        // To avoid index requirements, we'll use a client-side approach
         if (query.trim()) {
-          // If there's a search query, get all properties and filter client-side
-          const allProperties = await getAllProperties(500)
-          const normalizedQuery = normalizeText(query.toLowerCase())
-
-          results = allProperties.filter((asset) => {
-            // Search across multiple fields
-            const searchableFields = [
-              asset.reference_code,
-              asset.address,
-              asset.city,
-              asset.province,
-              asset.property_type,
-              asset.property_general_subtype,
-              asset.marketing_status,
-              asset.legal_phase,
-              asset.extras,
-            ]
-              .filter(Boolean)
-              .map((field) => normalizeText(field || ""))
-
-            return searchableFields.some((field) => field.includes(normalizedQuery))
-          })
-        } else if (Object.values(searchParams).some((param) => param && param !== "ALL")) {
-          // If there are filters, use getFilteredProperties
-          results = await getFilteredProperties(searchParams)
+          // Use the search function for text queries
+          results = await searchAssets(query)
         } else {
-          // No search query or filters, just get recent properties
-          const allProperties = await getAllProperties(50)
-          results = allProperties.sort((a, b) => {
-            const dateA = a.createdAt?.getTime() || 0
-            const dateB = b.createdAt?.getTime() || 0
-            return dateB - dateA // Descending order (newest first)
+          // Use filtered properties for filter-only searches
+          const hasFilters = Object.entries(searchParams).some(
+            ([key, value]) => value && value !== "ALL" && key !== "view" && key !== "q",
+          )
+
+          if (hasFilters) {
+            results = await getFilteredProperties(searchParams)
+          } else {
+            // No search query or filters, get recent properties
+            const allProperties = await getAllProperties(50)
+            results = allProperties.sort((a, b) => {
+              const dateA = a.createdAt?.getTime() || 0
+              const dateB = b.createdAt?.getTime() || 0
+              return dateB - dateA
+            })
+          }
+        }
+
+        // Apply additional client-side filtering if both query and filters exist
+        if (
+          query.trim() &&
+          Object.entries(searchParams).some(([key, value]) => value && value !== "ALL" && key !== "view" && key !== "q")
+        ) {
+          results = results.filter((asset) => {
+            let include = true
+
+            // Apply filters
+            if (
+              searchParams.property_type &&
+              searchParams.property_type !== "ALL" &&
+              asset.property_type !== searchParams.property_type
+            ) {
+              include = false
+            }
+
+            if (
+              include &&
+              searchParams.marketing_status &&
+              searchParams.marketing_status !== "ALL" &&
+              asset.marketing_status !== searchParams.marketing_status
+            ) {
+              include = false
+            }
+
+            if (
+              include &&
+              searchParams.legal_phase &&
+              searchParams.legal_phase !== "ALL" &&
+              asset.legal_phase !== searchParams.legal_phase
+            ) {
+              include = false
+            }
+
+            if (
+              include &&
+              searchParams.provincia_catastro &&
+              searchParams.provincia_catastro !== "ALL" &&
+              asset.provincia_catastro !== searchParams.provincia_catastro
+            ) {
+              include = false
+            }
+
+            if (
+              include &&
+              searchParams.municipio_catastro &&
+              searchParams.municipio_catastro !== "ALL" &&
+              asset.municipio_catastro !== searchParams.municipio_catastro
+            ) {
+              include = false
+            }
+
+            // Price filters
+            if (
+              include &&
+              searchParams.minPrice &&
+              asset.price_approx &&
+              asset.price_approx < Number(searchParams.minPrice)
+            ) {
+              include = false
+            }
+
+            if (
+              include &&
+              searchParams.maxPrice &&
+              asset.price_approx &&
+              asset.price_approx > Number(searchParams.maxPrice)
+            ) {
+              include = false
+            }
+
+            // Surface filters
+            const superficie = Number.parseFloat(asset.superficie_construida_m2) || 0
+            if (include && searchParams.minSqm && superficie < Number(searchParams.minSqm)) {
+              include = false
+            }
+
+            if (include && searchParams.maxSqm && superficie > Number(searchParams.maxSqm)) {
+              include = false
+            }
+
+            return include
           })
         }
 
         // Sort results
         if (sortOption === "price") {
           results.sort((a, b) => (a.price_approx || 0) - (b.price_approx || 0))
+        } else {
+          // Sort by relevance (keep original order for search, by date for others)
+          if (!query.trim()) {
+            results.sort((a, b) => {
+              const dateA = a.createdAt?.getTime() || 0
+              const dateB = b.createdAt?.getTime() || 0
+              return dateB - dateA
+            })
+          }
         }
 
         setAssets(results)

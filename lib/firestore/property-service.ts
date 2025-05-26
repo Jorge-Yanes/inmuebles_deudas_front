@@ -544,6 +544,162 @@ export async function getProperties(
   }
 }
 
+// Obtener propiedades filtradas - enfoque del lado del cliente
+export async function getFilteredProperties(filters: Record<string, string | undefined>): Promise<Asset[]> {
+  try {
+    console.log("Filtering properties with filters:", filters)
+
+    // Get all properties first
+    const allProperties = await getAllProperties(1000)
+
+    let filteredProperties = allProperties
+
+    // Apply filters
+    filteredProperties = allProperties.filter((asset) => {
+      let include = true
+
+      // Property type filter
+      if (filters.property_type && filters.property_type !== "ALL" && filters.property_type !== "all") {
+        if (asset.property_type !== filters.property_type) {
+          include = false
+        }
+      }
+
+      // Marketing status filter
+      if (
+        include &&
+        filters.marketing_status &&
+        filters.marketing_status !== "ALL" &&
+        filters.marketing_status !== "all"
+      ) {
+        if (asset.marketing_status !== filters.marketing_status) {
+          include = false
+        }
+      }
+
+      // Legal phase filter
+      if (include && filters.legal_phase && filters.legal_phase !== "ALL" && filters.legal_phase !== "all") {
+        if (asset.legal_phase !== filters.legal_phase) {
+          include = false
+        }
+      }
+
+      // Provincia filter
+      if (
+        include &&
+        filters.provincia_catastro &&
+        filters.provincia_catastro !== "ALL" &&
+        filters.provincia_catastro !== "all"
+      ) {
+        if (asset.provincia_catastro !== filters.provincia_catastro) {
+          include = false
+        }
+      }
+
+      // Municipio filter
+      if (
+        include &&
+        filters.municipio_catastro &&
+        filters.municipio_catastro !== "ALL" &&
+        filters.municipio_catastro !== "all"
+      ) {
+        if (asset.municipio_catastro !== filters.municipio_catastro) {
+          include = false
+        }
+      }
+
+      // Tipo via filter
+      if (
+        include &&
+        filters.tipo_via_catastro &&
+        filters.tipo_via_catastro !== "ALL" &&
+        filters.tipo_via_catastro !== "all"
+      ) {
+        if (asset.tipo_via_catastro !== filters.tipo_via_catastro) {
+          include = false
+        }
+      }
+
+      // Price filters
+      if (include && filters.minPrice) {
+        const minPrice = Number(filters.minPrice)
+        if (!asset.price_approx || asset.price_approx < minPrice) {
+          include = false
+        }
+      }
+
+      if (include && filters.maxPrice) {
+        const maxPrice = Number(filters.maxPrice)
+        if (!asset.price_approx || asset.price_approx > maxPrice) {
+          include = false
+        }
+      }
+
+      // Surface filters
+      if (include && (filters.minSqm || filters.maxSqm)) {
+        const superficie = Number.parseFloat(asset.superficie_construida_m2) || 0
+
+        if (filters.minSqm && superficie < Number(filters.minSqm)) {
+          include = false
+        }
+
+        if (include && filters.maxSqm && superficie > Number(filters.maxSqm)) {
+          include = false
+        }
+      }
+
+      // Rooms filter
+      if (include && filters.rooms && filters.rooms !== "Todas" && filters.rooms !== "all") {
+        if (filters.rooms === "+5") {
+          if (!asset.rooms || Number(asset.rooms) < 5) {
+            include = false
+          }
+        } else {
+          if (asset.rooms !== filters.rooms) {
+            include = false
+          }
+        }
+      }
+
+      // Bathrooms filter
+      if (include && filters.bathrooms && filters.bathrooms !== "Todos" && filters.bathrooms !== "all") {
+        if (filters.bathrooms === "+5") {
+          if (!asset.bathrooms || Number(asset.bathrooms) < 5) {
+            include = false
+          }
+        } else {
+          if (asset.bathrooms !== filters.bathrooms) {
+            include = false
+          }
+        }
+      }
+
+      // Year filters
+      if (include && filters.minYear && asset.ano_construccion_inmueble) {
+        const year = Number.parseInt(asset.ano_construccion_inmueble)
+        if (year < Number(filters.minYear)) {
+          include = false
+        }
+      }
+
+      if (include && filters.maxYear && asset.ano_construccion_inmueble) {
+        const year = Number.parseInt(asset.ano_construccion_inmueble)
+        if (year > Number(filters.maxYear)) {
+          include = false
+        }
+      }
+
+      return include
+    })
+
+    console.log(`Filtered ${filteredProperties.length} properties from ${allProperties.length} total`)
+    return filteredProperties
+  } catch (error) {
+    console.error("Error fetching filtered properties:", error)
+    return []
+  }
+}
+
 // Obtener valores únicos para filtros
 export async function getUniqueFieldValues(field: string): Promise<string[]> {
   try {
@@ -648,40 +804,6 @@ export async function searchProperties(query: string): Promise<Asset[]> {
     return results
   } catch (error) {
     console.error("Error searching properties:", error)
-    return []
-  }
-}
-
-// Obtener propiedades filtradas - enfoque del lado del cliente
-export async function getFilteredProperties(filters: Record<string, string | undefined>): Promise<Asset[]> {
-  try {
-    // Convertir los filtros al tipo AssetFilter
-    const assetFilters: AssetFilter = {
-      property_type: filters.property_type,
-      marketing_status: filters.marketing_status,
-      legal_phase: filters.legal_phase,
-      provincia_catastro: filters.provincia_catastro,
-      municipio_catastro: filters.municipio_catastro,
-      tipo_via_catastro: filters.tipo_via_catastro,
-      minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
-      maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
-      minSqm: filters.minSqm ? Number(filters.minSqm) : undefined,
-      maxSqm: filters.maxSqm ? Number(filters.maxSqm) : undefined,
-      query: filters.query,
-      ano_construccion_min: filters.ano_construccion_min,
-      ano_construccion_max: filters.ano_construccion_max,
-      precio_idealista_min: filters.precio_idealista_min ? Number(filters.precio_idealista_min) : undefined,
-      precio_idealista_max: filters.precio_idealista_max ? Number(filters.precio_idealista_max) : undefined,
-      has_parking: filters.has_parking,
-      rooms: filters.rooms,
-      bathrooms: filters.bathrooms,
-    }
-
-    // Usar la función getProperties para obtener propiedades filtradas
-    const result = await getProperties(assetFilters, 100)
-    return result.properties
-  } catch (error) {
-    console.error("Error fetching filtered properties:", error)
     return []
   }
 }

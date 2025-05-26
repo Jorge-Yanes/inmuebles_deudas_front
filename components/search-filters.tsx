@@ -33,8 +33,7 @@ export function SearchFilters({ searchParams }: SearchFiltersProps) {
   const [legalPhases, setLegalPhases] = useState<string[]>([])
   const [provincias, setProvincias] = useState<string[]>([])
   const [municipios, setMunicipios] = useState<string[]>([])
-  const [tiposVia, setTiposVia] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
+  const [tiposVia, setTiposVia] = useState(true)
 
   // State for current filter values
   const [filters, setFilters] = useState({
@@ -56,6 +55,8 @@ export function SearchFilters({ searchParams }: SearchFiltersProps) {
     minYear: searchParams.minYear || "",
     maxYear: searchParams.maxYear || "",
   })
+
+  const [loading, setLoading] = useState(true)
 
   // Fetch filter options
   useEffect(() => {
@@ -148,20 +149,25 @@ export function SearchFilters({ searchParams }: SearchFiltersProps) {
   const applyFilters = () => {
     const params = new URLSearchParams()
 
+    // Add current query if it exists
+    if (filters.query.trim()) {
+      params.set("q", filters.query.trim())
+    }
+
     // Only add non-empty filters to the URL
     Object.entries(filters).forEach(([key, value]) => {
-      if (value) {
+      if (value && key !== "query") {
         if (key === "propertyFeatures" && Array.isArray(value) && value.length > 0) {
           params.set(key, value.join(","))
-        } else if (key === "query") {
-          params.set("q", value as string)
-        } else if (value) {
-          params.set(key, value as string)
+        } else if (typeof value === "string" && value.trim() && value !== "all" && value !== "ALL") {
+          params.set(key, value.trim())
         }
       }
     })
 
-    router.push(`${pathname}?${params.toString()}`)
+    const newUrl = `${pathname}?${params.toString()}`
+    console.log("Applying filters, navigating to:", newUrl)
+    router.push(newUrl)
   }
 
   // Reset filters

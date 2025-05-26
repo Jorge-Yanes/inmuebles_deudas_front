@@ -53,6 +53,7 @@ export function SearchBar({
     const fetchSuggestions = async () => {
       if (query.trim().length < 2) {
         setSuggestions([])
+        setShowSuggestions(false)
         return
       }
 
@@ -60,8 +61,10 @@ export function SearchBar({
       try {
         const results = await getSearchSuggestions(query)
         setSuggestions(results)
+        setShowSuggestions(results.length > 0)
       } catch (error) {
         console.error("Error fetching suggestions:", error)
+        setSuggestions([])
       } finally {
         setIsLoading(false)
       }
@@ -72,11 +75,21 @@ export function SearchBar({
   }, [query])
 
   const handleSearch = (searchQuery: string) => {
-    if (searchQuery.trim()) {
+    const trimmedQuery = searchQuery.trim()
+    if (trimmedQuery) {
       // Always redirect to the search page with the query
-      router.push(`/search?q=${encodeURIComponent(searchQuery)}`)
+      const searchUrl = `/search?q=${encodeURIComponent(trimmedQuery)}`
+      router.push(searchUrl)
+    } else {
+      // If empty query, go to search page without query
+      router.push("/search")
     }
     setShowSuggestions(false)
+
+    // Call onSearch callback if provided
+    if (onSearch) {
+      onSearch(trimmedQuery)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
