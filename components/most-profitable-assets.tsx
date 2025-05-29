@@ -27,9 +27,6 @@ export function MostProfitableAssets() {
         setLoading(true)
         setError(null)
 
-        console.log("🔍 Debug - Starting asset fetch...")
-        console.log("🔍 Debug - User:", user ? "Present" : "Not present")
-        console.log("🔍 Debug - Can view assets:", user ? checkPermission("viewAssets") : "No user")
 
         // Debug info object
         const debug = {
@@ -41,18 +38,15 @@ export function MostProfitableAssets() {
         setDebugInfo(debug)
 
         if (!user) {
-          console.log("🔍 Debug - No user found, waiting...")
           setLoading(false)
           return
         }
 
         if (!checkPermission("viewAssets")) {
-          console.log("🔍 Debug - User lacks viewAssets permission")
           setLoading(false)
           return
         }
 
-        console.log("🔍 Debug - Fetching properties...")
 
         // Fetch properties with more generous parameters
         const result = await getProperties(
@@ -62,7 +56,6 @@ export function MostProfitableAssets() {
           user, // Pass user for permissions
         )
 
-        console.log("🔍 Debug - Properties result:", {
           count: result.properties.length,
           total: result.total,
           hasNext: result.hasNextPage,
@@ -73,28 +66,14 @@ export function MostProfitableAssets() {
 
         // If we have assets, randomly select 5 of them
         if (result.properties.length > 0) {
-          console.log("🔍 Debug - Selecting random assets from", result.properties.length, "properties")
 
           // Get 5 random assets from the result
           const shuffled = [...result.properties].sort(() => 0.5 - Math.random())
           const selected = shuffled.slice(0, 5)
 
-          console.log("🔍 Debug - Selected assets:", selected.length)
-          console.log(
-            "🔍 Debug - First asset sample:",
-            selected[0]
-              ? {
-                  id: selected[0].id,
-                  title: selected[0].title,
-                  city: selected[0].municipio_catastro,
-                  price: selected[0].price_approx,
-                }
-              : "No assets",
-          )
 
           setRandomAssets(selected)
         } else {
-          console.log("🔍 Debug - No properties found in result")
         }
       } catch (error) {
         console.error("🔍 Debug - Error fetching assets:", error)
@@ -115,15 +94,6 @@ export function MostProfitableAssets() {
   // Always use randomAssets for display
   const displayAssets = randomAssets.length > 0 ? randomAssets : []
 
-  console.log("🔍 Debug - Render state:", {
-    loading,
-    error,
-    hasUser: !!user,
-    canViewAssets: user ? checkPermission("viewAssets") : false,
-    assetsCount: assets.length,
-    randomAssetsCount: randomAssets.length,
-    displayAssetsCount: displayAssets.length,
-  })
 
   if (loading) {
     return (
