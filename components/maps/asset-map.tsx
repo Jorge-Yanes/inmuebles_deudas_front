@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useState, useMemo } from "react"
 import { useFieldPermissions } from "@/context/field-permissions-context"
 import { useAuth } from "@/context/auth-context"
 import type { Asset } from "@/types/asset"
 import { MapTypeSelector, type MapType } from "./map-type-selector"
-import { generateMapUrl, getCadastralMapUrl, getLocationForMap } from "@/lib/utils"
+import { getCadastralMapUrl, getLocationForMap } from "@/lib/utils"
+import GoogleMapBase from "./google-map-base"
 
 interface AssetMapProps {
   asset?: Asset
@@ -17,10 +18,7 @@ export default function AssetMap({ asset, assets = [], height = "100%" }: AssetM
   const { hasViewPermission } = useFieldPermissions()
   const { user } = useAuth()
   const [mapType, setMapType] = useState<MapType>("standard")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(false)
 
-  // Crear estilo estable
   const mapStyle = useMemo(() => {
     return typeof height === "number" ? { height: `${height}px` } : { height }
   }, [height])
@@ -55,12 +53,6 @@ export default function AssetMap({ asset, assets = [], height = "100%" }: AssetM
     return getLocationForMap(assetsWithLocation[0])
   }, [assetsWithLocation])
 
-  // Generar URL del mapa
-  const mapUrl = useMemo(() => {
-    if (!primaryLocationData?.fullLocation) return ""
-    return generateMapUrl(primaryLocationData.fullLocation)
-  }, [primaryLocationData])
-
   // Determinar si mostrar mapa catastral
   const showCadastralMap = useMemo(() => {
     return user?.role === "admin" && mapType === "cadastral" && hasCadastralPermission && hasCadastralData
@@ -71,25 +63,6 @@ export default function AssetMap({ asset, assets = [], height = "100%" }: AssetM
     if (!showCadastralMap) return null
     return assetsWithLocation.find((a) => a?.cadastral_reference) || null
   }, [showCadastralMap, assetsWithLocation])
-
-  // Efecto de carga simulada
-  useEffect(() => {
-    let mounted = true
-
-    setLoading(true)
-    setError(false)
-
-    const timer = setTimeout(() => {
-      if (mounted) {
-        setLoading(false)
-      }
-    }, 500)
-
-    return () => {
-      mounted = false
-      clearTimeout(timer)
-    }
-  }, [mapType, primaryLocationData])
 
   // Manejar estado vacío
   if (assetsWithLocation.length === 0) {
@@ -103,23 +76,6 @@ export default function AssetMap({ asset, assets = [], height = "100%" }: AssetM
     )
   }
 
-  // Manejar estado de carga
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full w-full bg-muted" style={mapStyle}>
-        <div className="text-center">
-          <p className="text-muted-foreground">Cargando mapa...</p>
-          {primaryLocationData && (
-            <p className="text-sm text-muted-foreground mt-1">
-              {primaryLocationData.city && `${primaryLocationData.city}, ${primaryLocationData.province}`}
-            </p>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // Renderizar el mapa
   return (
     <div className="relative w-full overflow-hidden rounded-md" style={mapStyle}>
       {user?.role === "admin" && (
@@ -143,7 +99,6 @@ export default function AssetMap({ asset, assets = [], height = "100%" }: AssetM
             tabIndex={0}
             title="Mapa catastral"
             loading="lazy"
-            onError={() => setError(true)}
           />
 
           {/* Información catastral */}
@@ -153,43 +108,7 @@ export default function AssetMap({ asset, assets = [], height = "100%" }: AssetM
           </div>
         </>
       ) : (
-        <>
-          <iframe
-            src={mapUrl}
-            width="100%"
-            height="100%"
-            frameBorder="0"
-            style={{ border: 0 }}
-            allowFullScreen
-            aria-hidden="false"
-            tabIndex={0}
-            title="Mapa de ubicación"
-            loading="lazy"
-            onError={() => setError(true)}
-          />
-
-          {/* Información de ubicación */}
-          {primaryLocationData && (
-            <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm rounded px-2 py-1 text-xs text-gray-700 max-w-[250px]">
-              {primaryLocationData.address && <div className="font-medium truncate">{primaryLocationData.address}</div>}
-              <div className="truncate">
-                {primaryLocationData.city && `${primaryLocationData.city}, `}
-                {primaryLocationData.province}
-                {primaryLocationData.postalCode && ` (${primaryLocationData.postalCode})`}
-              </div>
-              {assetsWithLocation.length > 1 && (
-                <div className="text-blue-600 font-medium">+{assetsWithLocation.length - 1} más</div>
-              )}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Indicador de error */}
-      {error && (
-        <div className="absolute top-2 right-2 bg-red-100 text-red-700 px-2 py-1 rounded text-xs">
-          Error al cargar mapa
-        </div>
+        <GoogleMapBase assets={assetsWithLocation} height="100%" showMarkers={true} className="w-full h-full" />
       )}
     </div>
   )

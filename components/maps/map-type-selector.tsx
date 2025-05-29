@@ -22,7 +22,7 @@ export const MapTypeSelector = memo(function MapTypeSelector({
   return (
     <TooltipProvider>
       <div
-        className="absolute top-2 right-2 z-10 flex gap-1 bg-background/80 p-1 rounded-md backdrop-blur-sm"
+        className="absolute top-4 right-4 z-10 flex gap-2 bg-background/90 p-3 rounded-lg backdrop-blur-sm shadow-lg"
         data-testid="map-type-selector"
       >
         <Tooltip>
@@ -35,9 +35,9 @@ export const MapTypeSelector = memo(function MapTypeSelector({
                 e.stopPropagation()
                 onChange("standard")
               }}
-              className="h-8 w-8"
+              className="h-12 w-12"
             >
-              <Map className="h-4 w-4" />
+              <Map className="h-6 w-6" />
               <span className="sr-only">Mapa Estándar</span>
             </Button>
           </TooltipTrigger>
@@ -56,10 +56,10 @@ export const MapTypeSelector = memo(function MapTypeSelector({
                 e.stopPropagation()
                 onChange("cadastral")
               }}
-              className="h-8 w-8"
+              className="h-12 w-12"
               disabled={!hasCadastralData}
             >
-              <FileText className="h-4 w-4" />
+              <FileText className="h-6 w-6" />
               <span className="sr-only">Mapa Catastral</span>
             </Button>
           </TooltipTrigger>

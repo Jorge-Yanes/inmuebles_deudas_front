@@ -289,7 +289,7 @@ export function SearchResults({ query, view = "list", searchParams = {} }: Searc
           </div>
         </TabsContent>
         <TabsContent value="map" className="mt-0">
-          <div className="h-[600px] rounded-md overflow-hidden border">
+          <div className="h-screen rounded-md overflow-hidden border">
             <AssetMap assets={assets} height="100%" />
           </div>
         </TabsContent>

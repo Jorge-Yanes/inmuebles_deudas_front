@@ -137,12 +137,14 @@ export function calculateRentalMarketValue(asset: Asset): number {
   return superficie * asset.precio_idealista_alquiler_m2
 }
 
+// Modificar la función getLocationForMap para priorizar los campos catastrales
 export function getLocationForMap(asset: Asset): {
   address: string
   postalCode: string
   city: string
   province: string
   fullLocation: string
+  formattedAddress: string // Nueva propiedad para geocodificación precisa
 } {
   const address = getFullAddress(asset)
   const postalCode = asset.codigo_postal_catastro || asset.zip_code || ""
@@ -153,26 +155,97 @@ export function getLocationForMap(asset: Asset): {
   const locationParts = [address, city, province, "España"].filter(Boolean)
   const fullLocation = locationParts.join(", ")
 
+  // Crear dirección formateada específicamente para geocodificación precisa
+  // usando exactamente los campos solicitados en el orden adecuado
+  let formattedAddress = ""
+
+  if (asset.tipo_via_catastro && asset.nombre_via_catastro) {
+    formattedAddress += `${asset.tipo_via_catastro} ${asset.nombre_via_catastro}`
+
+    if (asset.numero_portal_catastro) {
+      formattedAddress += ` ${asset.numero_portal_catastro}`
+    }
+  }
+
+  if (asset.municipio_catastro) {
+    formattedAddress += formattedAddress ? `, ${asset.municipio_catastro}` : asset.municipio_catastro
+  }
+
+  if (asset.provincia_catastro) {
+    formattedAddress += formattedAddress ? `, ${asset.provincia_catastro}` : asset.provincia_catastro
+  }
+
+  if (asset.codigo_postal_catastro) {
+    formattedAddress += formattedAddress ? `, ${asset.codigo_postal_catastro}` : asset.codigo_postal_catastro
+  }
+
+  // Añadir país
+  formattedAddress += formattedAddress ? ", España" : "España"
+
   return {
     address,
     postalCode,
     city,
     province,
     fullLocation,
+    formattedAddress,
   }
 }
 
-export function generateMapUrl(location: string, mapType: "osm" | "google" = "osm"): string {
+export function generateGoogleMapsEmbedUrl(location: string): string {
   const encodedLocation = encodeURIComponent(location)
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""
 
-  if (mapType === "google") {
-    return `https://maps.google.com/maps?q=${encodedLocation}&output=embed`
-  }
-
-  // OpenStreetMap por defecto
-  return `https://www.openstreetmap.org/export/embed.html?bbox=-10.0,35.0,5.0,44.0&layer=mapnik&marker=40.416775,-3.70379&query=${encodedLocation}`
+  return `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodedLocation}&zoom=15&maptype=roadmap`
 }
 
 export function getCadastralMapUrl(reference: string): string {
   return `https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?refcat=${reference}`
+}
+
+export function generateAssetInfoWindowContent(asset: Asset): string {
+  const address = getFullAddress(asset)
+  const propertyType = propertyTypeLabels[asset.property_type] || asset.property_type
+  const superficie = getSuperficie(asset)
+
+  return `
+    <div style="max-width: 300px; font-family: system-ui, -apple-system, sans-serif;">
+      <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #1f2937;">
+        ${propertyType}
+      </h3>
+      <p style="margin: 0 0 4px 0; font-size: 14px; color: #6b7280;">
+        📍 ${address}
+      </p>
+      <p style="margin: 0 0 4px 0; font-size: 14px; color: #6b7280;">
+        🏙️ ${asset.municipio_catastro}, ${asset.provincia_catastro}
+      </p>
+      ${
+        superficie !== "N/A"
+          ? `
+        <p style="margin: 0 0 4px 0; font-size: 14px; color: #6b7280;">
+          📐 ${superficie} m²
+        </p>
+      `
+          : ""
+      }
+      ${
+        asset.codigo_postal_catastro
+          ? `
+        <p style="margin: 0 0 8px 0; font-size: 14px; color: #6b7280;">
+          📮 ${asset.codigo_postal_catastro}
+        </p>
+      `
+          : ""
+      }
+      ${
+        asset.price_approx
+          ? `
+        <p style="margin: 0; font-size: 16px; font-weight: 600; color: #059669;">
+          💰 ${formatCurrency(asset.price_approx)}
+        </p>
+      `
+          : ""
+      }
+    </div>
+  `
 }
