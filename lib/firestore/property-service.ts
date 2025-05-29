@@ -160,6 +160,24 @@ function generateTitle(asset: Asset): string {
     Edificio: "Edificio",
     Oficina: "Oficina",
     Otros: "Otros",
+    vivienda_bloque_piso: "Vivienda en bloque/piso",
+    vivienda_pareada: "Vivienda pareada",
+    plaza_garaje: "Plaza de garaje",
+    trastero: "Trastero",
+    duplex: "Dúplex",
+    vivienda_aislada: "Vivienda aislada",
+    "finca_rustica/vivienda_aislada": "Finca rústica con vivienda aislada",
+    casa: "Casa",
+    vivienda_adosada: "Vivienda adosada",
+    nave_industrial: "Nave industrial",
+    local_comercial: "Local comercial",
+    parcela_vivienda: "Parcela para vivienda",
+    otro: "Otro",
+    hotel: "Hotel",
+    oficina: "Oficina",
+    land: "Terreno",
+    finca_rustica: "Finca rústica",
+    apartamento: "Apartamento",
   }
 
   const type = propertyTypeLabels[asset.property_type] || asset.property_type
@@ -192,6 +210,24 @@ function generateDescription(asset: Asset): string {
     Edificio: "Edificio",
     Oficina: "Oficina",
     Otros: "Otros",
+    vivienda_bloque_piso: "Vivienda en bloque/piso",
+    vivienda_pareada: "Vivienda pareada",
+    plaza_garaje: "Plaza de garaje",
+    trastero: "Trastero",
+    duplex: "Dúplex",
+    vivienda_aislada: "Vivienda aislada",
+    "finca_rustica/vivienda_aislada": "Finca rústica con vivienda aislada",
+    casa: "Casa",
+    vivienda_adosada: "Vivienda adosada",
+    nave_industrial: "Nave industrial",
+    local_comercial: "Local comercial",
+    parcela_vivienda: "Parcela para vivienda",
+    otro: "Otro",
+    hotel: "Hotel",
+    oficina: "Oficina",
+    land: "Terreno",
+    finca_rustica: "Finca rústica",
+    apartamento: "Apartamento",
   }
 
   const legalPhaseLabels: Record<string, string> = {
@@ -712,7 +748,7 @@ export async function getFilteredProperties(filters: Record<string, string | und
 // Obtener valores únicos para filtros
 export async function getUniqueFieldValues(field: string): Promise<string[]> {
   try {
-    const querySnapshot = await getDocs(collection(db, "inmueblesMayo", limit(500)))
+    const querySnapshot = await getDocs(query(collection(db, "inmueblesMayo"), limit(500)))
     const uniqueValues = new Set<string>()
 
     querySnapshot.forEach((doc) => {
