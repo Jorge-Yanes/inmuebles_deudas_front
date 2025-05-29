@@ -200,24 +200,23 @@ export const fieldLabels: Record<string, string> = {
 
 // Mapeo de tipos de propiedad para mostrar en español
 export const propertyTypeLabels: Record<string, string> = {
-  vivienda_bloque_piso: "Vivienda en bloque/piso",
-  vivienda_pareada: "Vivienda pareada",
-  plaza_garaje: "Plaza de garaje",
-  trastero: "Trastero",
-  duplex: "Dúplex",
-  vivienda_aislada: "Vivienda aislada",
-  "finca_rustica/vivienda_aislada": "Finca rústica con vivienda aislada",
-  casa: "Casa",
-  vivienda_adosada: "Vivienda adosada",
-  nave_industrial: "Nave industrial",
-  local_comercial: "Local comercial",
-  parcela_vivienda: "Parcela para vivienda",
-  otro: "Otro",
-  hotel: "Hotel",
-  oficina: "Oficina",
-  land: "Terreno",
-  finca_rustica: "Finca rústica",
-  apartamento: "Apartamento"
+  RESIDENTIAL: "Residencial",
+  COMMERCIAL: "Comercial",
+  INDUSTRIAL: "Industrial",
+  LAND: "Terreno",
+  PARKING: "Garaje",
+  STORAGE: "Trastero",
+  OTHER: "Otro",
+  // Nuevos tipos según la base de datos
+  Vivienda: "Vivienda",
+  "Local Comercial": "Local Comercial",
+  Garaje: "Garaje",
+  Trastero: "Trastero",
+  "Nave Industrial": "Nave Industrial",
+  Suelo: "Suelo",
+  Edificio: "Edificio",
+  Oficina: "Oficina",
+  Otros: "Otros",
 }
 
 // Mapeo de estados de marketing para mostrar en español

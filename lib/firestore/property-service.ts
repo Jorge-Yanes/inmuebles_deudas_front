@@ -4,9 +4,7 @@ import {
   getDoc,
   getDocs,
   query,
-  orderBy,
   limit,
-  startAfter,
   type Timestamp,
   type DocumentData,
   type QueryDocumentSnapshot,
@@ -146,24 +144,22 @@ export const convertDocToAsset = (doc: DocumentData): Asset => {
 // Función auxiliar para generar título
 function generateTitle(asset: Asset): string {
   const propertyTypeLabels: Record<string, string> = {
-    vivienda_bloque_piso: "Vivienda en bloque/piso",
-    vivienda_pareada: "Vivienda pareada",
-    plaza_garaje: "Plaza de garaje",
-    trastero: "Trastero",
-    duplex: "Dúplex",
-    vivienda_aislada: "Vivienda aislada",
-    "finca_rustica/vivienda_aislada": "Finca rústica con vivienda aislada",
-    casa: "Casa",
-    vivienda_adosada: "Vivienda adosada",
-    nave_industrial: "Nave industrial",
-    local_comercial: "Local comercial",
-    parcela_vivienda: "Parcela para vivienda",
-    otro: "Otro",
-    hotel: "Hotel",
-    oficina: "Oficina",
-    land: "Terreno",
-    finca_rustica: "Finca rústica",
-    apartamento: "Apartamento"
+    RESIDENTIAL: "Residencial",
+    COMMERCIAL: "Comercial",
+    INDUSTRIAL: "Industrial",
+    LAND: "Terreno",
+    PARKING: "Garaje",
+    STORAGE: "Trastero",
+    OTHER: "Otro",
+    Vivienda: "Vivienda",
+    "Local Comercial": "Local Comercial",
+    Garaje: "Garaje",
+    Trastero: "Trastero",
+    "Nave Industrial": "Nave Industrial",
+    Suelo: "Suelo",
+    Edificio: "Edificio",
+    Oficina: "Oficina",
+    Otros: "Otros",
   }
 
   const type = propertyTypeLabels[asset.property_type] || asset.property_type
@@ -180,24 +176,22 @@ function generateTitle(asset: Asset): string {
 // Función auxiliar para generar descripción
 function generateDescription(asset: Asset): string {
   const propertyTypeLabels: Record<string, string> = {
-    vivienda_bloque_piso: "Vivienda en bloque/piso",
-    vivienda_pareada: "Vivienda pareada",
-    plaza_garaje: "Plaza de garaje",
-    trastero: "Trastero",
-    duplex: "Dúplex",
-    vivienda_aislada: "Vivienda aislada",
-    "finca_rustica/vivienda_aislada": "Finca rústica con vivienda aislada",
-    casa: "Casa",
-    vivienda_adosada: "Vivienda adosada",
-    nave_industrial: "Nave industrial",
-    local_comercial: "Local comercial",
-    parcela_vivienda: "Parcela para vivienda",
-    otro: "Otro",
-    hotel: "Hotel",
-    oficina: "Oficina",
-    land: "Terreno",
-    finca_rustica: "Finca rústica",
-    apartamento: "Apartamento"
+    RESIDENTIAL: "Residencial",
+    COMMERCIAL: "Comercial",
+    INDUSTRIAL: "Industrial",
+    LAND: "Terreno",
+    PARKING: "Garaje",
+    STORAGE: "Trastero",
+    OTHER: "Otro",
+    Vivienda: "Vivienda",
+    "Local Comercial": "Local Comercial",
+    Garaje: "Garaje",
+    Trastero: "Trastero",
+    "Nave Industrial": "Nave Industrial",
+    Suelo: "Suelo",
+    Edificio: "Edificio",
+    Oficina: "Oficina",
+    Otros: "Otros",
   }
 
   const legalPhaseLabels: Record<string, string> = {
@@ -308,20 +302,30 @@ export async function getPropertyById(id: string, user?: User | null): Promise<A
 // Obtener todas las propiedades sin filtrado ni ordenación
 export async function getAllProperties(maxLimit = 500): Promise<Asset[]> {
   try {
+    console.log("🔍 getAllProperties - Starting with limit:", maxLimit)
+
     // Consulta simple con solo un límite - sin filtrado ni ordenación
     const propertiesQuery = query(collection(db, "inmueblesMayo"), limit(maxLimit))
     const querySnapshot = await getDocs(propertiesQuery)
 
+    console.log("🔍 getAllProperties - Query snapshot size:", querySnapshot.size)
+    console.log("🔍 getAllProperties - Query snapshot empty:", querySnapshot.empty)
+
     const properties: Asset[] = []
 
     querySnapshot.forEach((doc) => {
-      const asset = convertDocToAsset(doc)
-      properties.push(asset)
+      try {
+        const asset = convertDocToAsset(doc)
+        properties.push(asset)
+      } catch (error) {
+        console.error("🔍 getAllProperties - Error converting doc:", doc.id, error)
+      }
     })
 
+    console.log("🔍 getAllProperties - Converted properties:", properties.length)
     return properties
   } catch (error) {
-    console.error("Error fetching all properties:", error)
+    console.error("🔍 getAllProperties - Error fetching all properties:", error)
     return []
   }
 }
@@ -332,52 +336,45 @@ export async function getProperties(
   pageSize = 10,
   lastVisible?: QueryDocumentSnapshot<DocumentData>,
   user?: User | null,
-): Promise<{ properties: Asset[]; lastVisible: QueryDocumentSnapshot<DocumentData> | null }> {
+): Promise<{
+  properties: Asset[]
+  lastVisible: QueryDocumentSnapshot<DocumentData> | null
+  total?: number
+  hasNextPage?: boolean
+}> {
   try {
-    console.log("Property service: Getting properties with filters:", filters)
+    console.log("🔍 getProperties - Starting with filters:", filters)
+    console.log("🔍 getProperties - Page size:", pageSize)
 
-    // Para evitar requerir índices compuestos, usaremos diferentes estrategias:
+    // Primero, intentemos obtener todas las propiedades para verificar si hay datos
+    const allProperties = await getAllProperties(pageSize * 2) // Obtener más para tener opciones
 
-    // 1. Si no se aplican filtros, podemos usar orderBy de forma segura
-    if (!filters || Object.values(filters).every((v) => !v || v === "ALL")) {
-      // Sin filtros, solo ordenar por createdAt
-      const simpleQuery = query(collection(db, "inmueblesMayo"), orderBy("createdAt", "desc"), limit(pageSize))
+    console.log("🔍 getProperties - All properties count:", allProperties.length)
 
-      // Aplicar paginación para consultas sin filtros
-      if (lastVisible) {
-        const paginatedQuery = query(
-          collection(db, "inmueblesMayo"),
-          orderBy("createdAt", "desc"),
-          startAfter(lastVisible),
-          limit(pageSize),
-        )
-
-        const querySnapshot = await getDocs(paginatedQuery)
-        const properties: Asset[] = []
-        let newLastVisible: QueryDocumentSnapshot<DocumentData> | null = null
-
-        querySnapshot.forEach((doc) => {
-          properties.push(convertDocToAsset(doc))
-          newLastVisible = doc
-        })
-
-        return { properties, lastVisible: newLastVisible }
-      }
-
-      const querySnapshot = await getDocs(simpleQuery)
-      const properties: Asset[] = []
-      let newLastVisible: QueryDocumentSnapshot<DocumentData> | null = null
-
-      querySnapshot.forEach((doc) => {
-        properties.push(convertDocToAsset(doc))
-        newLastVisible = doc
-      })
-
-      return { properties, lastVisible: newLastVisible }
+    if (allProperties.length === 0) {
+      console.log("🔍 getProperties - No properties found in database")
+      return { properties: [], lastVisible: null, total: 0, hasNextPage: false }
     }
 
-    // 2. Para consultas filtradas, obtendremos todas las propiedades y filtraremos del lado del cliente
-    const allProperties = await getAllProperties(500) // Límite a 500 para evitar lecturas excesivas
+    // Si no hay filtros, devolver las primeras propiedades
+    if (!filters || Object.values(filters).every((v) => !v || v === "ALL")) {
+      console.log("🔍 getProperties - No filters applied, returning first", pageSize, "properties")
+
+      const pagedProperties = allProperties.slice(0, pageSize)
+      let newLastVisible: QueryDocumentSnapshot<DocumentData> | null = null
+
+      if (pagedProperties.length > 0) {
+        const lastId = pagedProperties[pagedProperties.length - 1].id
+        newLastVisible = { id: lastId } as QueryDocumentSnapshot<DocumentData>
+      }
+
+      return {
+        properties: pagedProperties,
+        lastVisible: newLastVisible,
+        total: allProperties.length,
+        hasNextPage: allProperties.length > pageSize,
+      }
+    }
 
     // Aplicar filtros del lado del cliente
     let filteredProperties = allProperties
@@ -538,13 +535,21 @@ export async function getProperties(
       newLastVisible = { id: lastId } as QueryDocumentSnapshot<DocumentData>
     }
 
+    console.log("🔍 getProperties - Returning:", {
+      propertiesCount: pagedProperties.length,
+      totalFiltered: filteredProperties.length,
+      hasNext: endIndex < filteredProperties.length,
+    })
+
     return {
       properties: pagedProperties,
       lastVisible: newLastVisible,
+      total: filteredProperties.length,
+      hasNextPage: endIndex < filteredProperties.length,
     }
   } catch (error) {
-    console.error("Error fetching properties:", error)
-    return { properties: [], lastVisible: null }
+    console.error("🔍 getProperties - Error fetching properties:", error)
+    return { properties: [], lastVisible: null, total: 0, hasNextPage: false }
   }
 }
 
@@ -707,7 +712,7 @@ export async function getFilteredProperties(filters: Record<string, string | und
 // Obtener valores únicos para filtros
 export async function getUniqueFieldValues(field: string): Promise<string[]> {
   try {
-    const querySnapshot = await getDocs(collection(db, "inmueblesMayo"))
+    const querySnapshot = await getDocs(collection(db, "inmueblesMayo", limit(500)))
     const uniqueValues = new Set<string>()
 
     querySnapshot.forEach((doc) => {
