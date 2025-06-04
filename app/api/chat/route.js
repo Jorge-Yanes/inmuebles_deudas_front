@@ -10,7 +10,18 @@ const location = process.env.VERTEX_AI_LOCATION || "us-central1"; // Región por
 const firestoreDatabaseId = process.env.FIRESTORE_DATABASE_ID || "(default)";
 const vertexAiSearchDataStoreId = process.env.VERTEX_AI_SEARCH_DATA_STORE_ID;
 
-import { auth } from 'google-auth-library';
+import { GoogleAuth } from 'google-auth-library';
+
+const credentialsJSON = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+
+if (!credentialsJSON) {
+  throw new Error("❌ Falta la variable de entorno GOOGLE_APPLICATION_CREDENTIALS_JSON.");
+}
+
+const auth = new GoogleAuth({
+  credentials: JSON.parse(credentialsJSON),
+  scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+});
 
 const authClient = await auth.getClient();
 const project = await auth.getProjectId();
@@ -22,7 +33,13 @@ if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
   throw new Error("❌ GOOGLE_APPLICATION_CREDENTIALS_JSON no está definida.");
 }
 
-const parsedCredentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+const rawCredentials = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+if (!rawCredentials) {
+  throw new Error("❌ Falta la variable GOOGLE_APPLICATION_CREDENTIALS_JSON");
+}
+const credentials = JSON.parse(rawCredentials);
+
+
 
 // Verificamos que las variables clave estén definidas
 if (
@@ -38,14 +55,14 @@ if (
 const firestore = new Firestore({
   projectId: projectId,
   databaseId: firestoreDatabaseId,
-  credentials: parsedCredentials,
+  credentials,
 });
 
 // 🤖 Inicializamos el cliente de Vertex AI
 const vertex_ai = new VertexAI({
   project: projectId,
   location: location,
-  credentials: parsedCredentials,
+  credentials, // <- pasamos el objeto directamente
 });
 
 // 📦 Construimos el nombre completo del data store para las búsquedas
