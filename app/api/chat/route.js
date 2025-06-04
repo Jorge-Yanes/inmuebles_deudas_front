@@ -110,12 +110,28 @@ export async function POST(req) {
 
   try {
     // 🧠 Paso 1: Gemini intenta extraer criterios de búsqueda
-    const prompt = `Eres un asistente de IA que extrae criterios de búsqueda de propiedades a partir del mensaje del usuario. Tu respuesta debe ser un objeto JSON con posibles campos como "municipio_catastro", "minPrice", "maxPrice", "rooms", "Property Type". Si no se encuentran criterios o el usuario hace una pregunta que no se puede traducir directamente a criterios de búsqueda, devuelve un objeto JSON vacío {}. Solo incluye campos para los que el usuario haya proporcionado explícitamente un valor o rango.
+    const prompt = `Eres un asistente especializado en propiedades inmobiliarias en España. Tu tarea es analizar el mensaje del usuario y extraer criterios de búsqueda relevantes. Devuelve un objeto JSON con campos como:
 
-Mensaje del usuario: "${userQuery}"
-
-Salida JSON:
-`;
+    - municipio_catastro
+    - provincia_catastro
+    - price_approx (puede tener min y/o max)
+    - superficie_construida_m2
+    - rooms
+    - bathrooms
+    - property_type o Property Type
+    - uso_predominante_inmueble
+    - precio_idealista_venta_m2
+    - tipo_procedimiento
+    - fase_procedimiento
+    - estado_posesion_fisica
+    - has_parking;
+    
+    Si no puedes identificar ningún criterio, devuelve '{}'. 
+    Si el mensaje del usuario no es una búsqueda, ignóralo y responde '{}'.
+    
+    Mensaje del usuario: "${userQuery}"
+    
+    Salida JSON:`;
 
     const geminiResponse = await generativeModel.generateContent(prompt);
 console.log('🔍 Respuesta cruda desde Vertex AI:', JSON.stringify(geminiResponse, null, 2));
@@ -129,7 +145,7 @@ console.log('🔍 Respuesta cruda desde Vertex AI:', JSON.stringify(geminiRespon
         searchParameters = JSON.parse(jsonMatch[0]);
       } else {
         console.warn("⚠️ Gemini no devolvió JSON válido:", geminiText);
-        const fallbackPrompt = `El usuario dijo: "${userQuery}". No pude extraer criterios de búsqueda específicos. Responde de manera conversacional, en español, y pídele más información. Usa formato Markdown para facilitar la lectura.`;
+        const fallbackPrompt = `El usuario ha dicho: "${userQuery}". No he podido extraer criterios de búsqueda claros. Formula una respuesta conversacional en español, educada y amigable, y haz una o dos preguntas para ayudar a concretar mejor qué tipo de propiedad busca, por ejemplo: ubicación, tipo, precio, número de habitaciones, etc.`;
         const fallbackResponse = await generativeModel.generateContent(
           fallbackPrompt
         );
@@ -220,13 +236,8 @@ console.log('🔍 Respuesta cruda desde Vertex AI:', JSON.stringify(geminiRespon
           conversationalResponseGen.response.candidates[0]?.content?.parts[0]
             ?.text;
       } else {
-        const noResultsPrompt = `El usuario buscó propiedades con el mensaje: "${userQuery}", pero no se encontraron resultados. Genera un mensaje conversacional y amable en español, explicando la situación y sugiriendo:
-  
-  - Probar con un presupuesto distinto.
-  - Buscar en otra zona cercana.
-  - Considerar un tipo de propiedad diferente.
-
-  Usa formato Markdown para claridad.`;
+        const noResultsPrompt = `El usuario buscaba propiedades con base en: "${userQuery}", pero no se encontraron resultados. Responde en tono amistoso en español, menciona que no hay coincidencias y sugiere amablemente cambiar algunos criterios. También puedes hacer una pregunta para orientar mejor la búsqueda.
+`;
         const noResultsResponse = await generativeModel.generateContent(
           noResultsPrompt
         );
@@ -285,23 +296,42 @@ console.log('🔍 Respuesta cruda desde Vertex AI:', JSON.stringify(geminiRespon
 }
 // 🔧 Función auxiliar para construir el filtro de Vertex AI Search
 function buildVertexAISearchFilter(params) {
-    const filters = [];
-  
-    if (params.city) {
-      filters.push(`municipio_catastro:"${params.city}"`);
+  const filters = [];
+
+  const fieldMap = {
+    municipio_catastro: "municipio_catastro",
+    provincia_catastro: "provincia_catastro",
+    "Property Type": "Property Type",
+    property_type: "property_type",
+    tipo_procedimiento: "tipo_procedimiento",
+    fase_procedimiento: "fase_procedimiento",
+    fase_actual: "fase_actual",
+    rooms: "rooms",
+    bathrooms: "bathrooms",
+    has_parking: "has_parking",
+    uso_predominante_inmueble: "uso_predominante_inmueble",
+    superficie_construida_m2: "superficie_construida_m2",
+    ano_construccion_inmueble: "ano_construccion_inmueble",
+    precio_idealista_venta_m2: "precio_idealista_venta_m2",
+    precio_idealista_alquiler_m2: "precio_idealista_alquiler_m2",
+    price_approx: "price_approx",
+    auction_value: "auction_value",
+    purchase_price: "purchase_price"
+  };
+
+  for (const key in params) {
+    const value = params[key];
+    const field = fieldMap[key];
+    if (!field || value === undefined || value === null) continue;
+
+    if (typeof value === 'number') {
+      filters.push(`${field} = ${value}`);
+    } else if (typeof value === 'string') {
+      filters.push(`${field}:"${value}"`);
+    } else if (typeof value === 'object' && value.min !== undefined && value.max !== undefined) {
+      filters.push(`${field} >= ${value.min} AND ${field} <= ${value.max}`);
     }
-    if (params.minPrice) {
-      filters.push(`price_approx >= ${params.minPrice}`);
-    }
-    if (params.maxPrice) {
-      filters.push(`price_approx <= ${params.maxPrice}`);
-    }
-    if (params.bedrooms) {
-      filters.push(`rooms >= ${params.bedrooms}`);
-    }
-    if (params.propertyType) {
-      filters.push(`"Property Type":"${params.propertyType}"`);
-    }
-  
-    return filters.join(" AND ");
   }
+
+  return filters.join(" AND ");
+}

@@ -26,74 +26,57 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
         return null; // Or a placeholder card indicating missing data
     }
 
-    const {
-        direccion,
-        municipio_catastro,
-        price_approx,
-        rooms,
-        metros_cuadrados,
-        url_imagen,
-        descripcion,
-        ["Property Type"]: propertyType,
-        // Access other relevant fields here, matching the Property interface
-    } = property;
-
-    // Basic formatting for currency
-    const formattedPrecio = price_approx !== undefined && price_approx !== null
-        ? new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(price_approx)
-        : 'Precio no disponible';
-
+    // Nuevo layout con campos clave y fallbacks
     return (
-        <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col">
-            {/* Property Image */}
-            {url_imagen ? ( // Use ternary for conditional rendering
-                <img
-                    src={url_imagen}
-                    alt={`Imagen de ${direccion || 'la propiedad'}`}
-                    className="w-full h-48 object-cover"
-                />
-            ) : (
-                <div className="w-full h-48 bg-gray-200 flex items-center justify-center text-gray-500 text-sm">
-                    No image available
-                </div>
-            )}
+        <div className="border p-4 rounded-md shadow-md bg-white space-y-2">
+          <h3 className="text-lg font-semibold text-gray-800">
+            {property.direccion_texto_catastro || 'Dirección no disponible'}
+          </h3>
+          <p className="text-sm text-gray-600">
+            {property.municipio_catastro || ''}, {property.provincia_catastro || ''}
+          </p>
 
-            {/* Property Details */}
-            <div className="p-4 flex flex-col flex-grow">
-                <h3 className="text-lg font-semibold text-gray-800 mb-1">
-                    {direccion || 'Dirección no disponible'}
-                </h3>
-                {municipio_catastro && <p className="text-sm text-gray-600 mb-2">{municipio_catastro}</p>}
+          <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
+            <p><strong>Tipo:</strong> {property.property_type || property['Property Type'] || 'N/D'}</p>
+            <p><strong>Superficie:</strong> {property.sqm ? `${property.sqm} m²` : property.superficie_construida_m2 || 'N/D'}</p>
+            <p><strong>Habitaciones:</strong> {property.rooms || 'N/D'}</p>
+            <p><strong>Baños:</strong> {property.bathrooms || 'N/D'}</p>
+            <p><strong>Precio aprox.:</strong> {property.price_approx ? `${property.price_approx.toLocaleString()} €` : 'N/D'}</p>
+            <p><strong>Subasta:</strong> {property.fecha_subasta || 'N/D'}</p>
+            <p><strong>Fase actual:</strong> {property.fase_actual || 'N/D'}</p>
+            <p><strong>Deuda total:</strong> {property.deuda || property.DEUDA || 'N/D'}</p>
+          </div>
 
-                <div className="flex justify-between items-center mb-2">
-                    <span className="text-blue-600 font-bold text-md">{formattedPrecio}</span>
-                    {rooms !== undefined && rooms !== null && (
-                        <span className="text-gray-700 text-sm">{rooms} hab.</span>
-                    )}
-                </div>
-
-                {propertyType && (
-                    <p className="text-sm text-gray-500 mb-2">{propertyType}</p>
-                )}
-
-                {metros_cuadrados !== undefined && metros_cuadrados !== null && (
-                    <p className="text-sm text-gray-600 mb-2">{metros_cuadrados} m²</p>
-                )}
-
-                {/* Optional: Short Description */}
-                {descripcion && (
-                    <div className="text-gray-700 text-sm leading-tight max-h-32 overflow-hidden text-ellipsis">
-                        <ReactMarkdown>{descripcion}</ReactMarkdown>
-                    </div>
-                )}
-
-                {/* Optional: Add a link */}
-                {/* <div className="mt-4">
-            <button className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors duration-200">
-                Ver detalles
-            </button>
-        </div> */}
+          {/* Rentabilidad estimada */}
+          {typeof property.hipoges_value_total === 'number' && typeof property.purchase_price === 'number' && (
+            <div style={{ marginTop: '8px', padding: '6px', backgroundColor: '#e0f7e9', borderRadius: '5px', color: '#146c43' }}>
+              <strong>Rentabilidad estimada:</strong> {(((property.hipoges_value_total - property.purchase_price) / property.purchase_price) * 100).toFixed(1)}%
             </div>
+          )}
+
+          {/* Aviso de subasta próxima */}
+          {property.fecha_subasta && (() => {
+            const auctionDate = new Date(property.fecha_subasta);
+            const today = new Date();
+            // Reset time for today to midnight to avoid hour diffs
+            today.setHours(0,0,0,0);
+            auctionDate.setHours(0,0,0,0);
+            const diffDays = Math.floor((auctionDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            if (diffDays >= 0 && diffDays <= 15) {
+              return (
+                <div style={{ marginTop: '8px', padding: '6px', backgroundColor: '#fff3cd', borderRadius: '5px', color: '#856404' }}>
+                  ⏰ <strong>¡Subasta próxima en {diffDays} días!</strong>
+                </div>
+              );
+            }
+            return null;
+          })()}
+
+          {property.descripcion && (
+            <p className="text-sm text-gray-600 mt-2">
+              {property.descripcion.slice(0, 200)}...
+            </p>
+          )}
         </div>
     );
 };
