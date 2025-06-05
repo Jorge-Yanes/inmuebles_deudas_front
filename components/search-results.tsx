@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { List, MapPin } from "lucide-react"
-
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { getFilteredProperties, getAllProperties } from "@/lib/firestore/property-service"
+import { getAllProperties } from "@/lib/firestore/property-service"
 import type { Asset } from "@/types/asset"
 import { AssetGridItem } from "@/components/asset-grid-item"
 import AssetMap from "@/components/maps/asset-map"
@@ -32,143 +31,59 @@ export function SearchResults({ query, view = "list", searchParams = {} }: Searc
     const fetchResults = async () => {
       setLoading(true)
       setError(null)
-
       try {
-        let results: Asset[] = []
-
-        if (query.trim()) {
-          // Use the search function for text queries
-          results = await searchAssets(query)
+        // Determine if any UI filters are active (excluding q and view)
+        const entries = Array.from(
+          // Next.js useSearchParams returns URLSearchParams-like object
+          (searchParams as any).entries()
+        ) as [string, string][];
+        const hasFilters = entries.some(
+          ([key, value]) => value && value !== 'ALL' && value !== 'all' && key !== 'q' && key !== 'view'
+        );
+        let results: Asset[] = [];
+        if (query.trim() || hasFilters) {
+          // Build filters object for Vertex
+          const filters: Record<string, any> = {};
+          entries.forEach(([key, value]) => {
+            if (!value || value === 'ALL' || value === 'all') return;
+            if (key === 'q' || key === 'view') return;
+            if (key === 'propertyFeatures') {
+              filters.propertyFeatures = value.split(',');
+            } else {
+              filters[key] = value;
+            }
+          });
+          results = await searchAssets(query, filters);
         } else {
-          // Use filtered properties for filter-only searches
-          const hasFilters = Object.entries(searchParams).some(
-            ([key, value]) => value && value !== "ALL" && key !== "view" && key !== "q",
-          )
-
-          if (hasFilters) {
-            results = await getFilteredProperties(searchParams)
-          } else {
-            // No search query or filters, get recent properties
-            const allProperties = await getAllProperties(50)
-            results = allProperties.sort((a, b) => {
-              const dateA = a.createdAt?.getTime() || 0
-              const dateB = b.createdAt?.getTime() || 0
-              return dateB - dateA
-            })
-          }
+          // No search and no filters: show recent properties
+          const allProps = await getAllProperties(50);
+          results = allProps.sort((a, b) => {
+            const dateA = a.createdAt?.getTime() || 0;
+            const dateB = b.createdAt?.getTime() || 0;
+            return dateB - dateA;
+          });
         }
-
-        // Apply additional client-side filtering if both query and filters exist
-        if (
-          query.trim() &&
-          Object.entries(searchParams).some(([key, value]) => value && value !== "ALL" && key !== "view" && key !== "q")
-        ) {
-          results = results.filter((asset) => {
-            let include = true
-
-            // Apply filters
-            if (
-              searchParams.property_type &&
-              searchParams.property_type !== "ALL" &&
-              asset.property_type !== searchParams.property_type
-            ) {
-              include = false
-            }
-
-            if (
-              include &&
-              searchParams.marketing_status &&
-              searchParams.marketing_status !== "ALL" &&
-              asset.marketing_status !== searchParams.marketing_status
-            ) {
-              include = false
-            }
-
-            if (
-              include &&
-              searchParams.legal_phase &&
-              searchParams.legal_phase !== "ALL" &&
-              asset.legal_phase !== searchParams.legal_phase
-            ) {
-              include = false
-            }
-
-            if (
-              include &&
-              searchParams.provincia_catastro &&
-              searchParams.provincia_catastro !== "ALL" &&
-              asset.provincia_catastro !== searchParams.provincia_catastro
-            ) {
-              include = false
-            }
-
-            if (
-              include &&
-              searchParams.municipio_catastro &&
-              searchParams.municipio_catastro !== "ALL" &&
-              asset.municipio_catastro !== searchParams.municipio_catastro
-            ) {
-              include = false
-            }
-
-            // Price filters
-            if (
-              include &&
-              searchParams.minPrice &&
-              asset.price_approx &&
-              asset.price_approx < Number(searchParams.minPrice)
-            ) {
-              include = false
-            }
-
-            if (
-              include &&
-              searchParams.maxPrice &&
-              asset.price_approx &&
-              asset.price_approx > Number(searchParams.maxPrice)
-            ) {
-              include = false
-            }
-
-            // Surface filters
-            const superficie = Number.parseFloat(asset.superficie_construida_m2) || 0
-            if (include && searchParams.minSqm && superficie < Number(searchParams.minSqm)) {
-              include = false
-            }
-
-            if (include && searchParams.maxSqm && superficie > Number(searchParams.maxSqm)) {
-              include = false
-            }
-
-            return include
-          })
+        // Apply sorting option
+        if (sortOption === 'price') {
+          results.sort((a, b) => (a.price_approx || 0) - (b.price_approx || 0));
+        } else if (!query.trim()) {
+          // relevance default for non-text searches: by date
+          results.sort((a, b) => {
+            const dateA = a.createdAt?.getTime() || 0;
+            const dateB = b.createdAt?.getTime() || 0;
+            return dateB - dateA;
+          });
         }
-
-        // Sort results
-        if (sortOption === "price") {
-          results.sort((a, b) => (a.price_approx || 0) - (b.price_approx || 0))
-        } else {
-          // Sort by relevance (keep original order for search, by date for others)
-          if (!query.trim()) {
-            results.sort((a, b) => {
-              const dateA = a.createdAt?.getTime() || 0
-              const dateB = b.createdAt?.getTime() || 0
-              return dateB - dateA
-            })
-          }
-        }
-
-        setAssets(results)
+        setAssets(results);
       } catch (error) {
-        console.error("Error fetching assets:", error)
-        setError("Error al cargar los activos inmobiliarios. Por favor, inténtalo de nuevo.")
+        console.error('Error fetching assets:', error);
+        setError('Error al cargar los activos inmobiliarios. Por favor, inténtalo de nuevo.');
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-
-    fetchResults()
-  }, [query, searchParams, sortOption])
+    };
+    fetchResults();
+  }, [query, searchParams, sortOption]);
 
   const handleViewChange = (view: "list" | "map") => {
     setActiveView(view)
