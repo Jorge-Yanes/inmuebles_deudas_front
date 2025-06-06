@@ -1,38 +1,91 @@
+// Defines the comprehensive structure for a real estate asset
 export interface Asset {
-  puerta_catastro?: string
-  planta_catastro?: string
-  hipoges_value_total?: number | null
-  direccion_texto_catastro?: string
-  uw_value?: number | null
-  precio_idealista_alquiler_m2?: number
-  provincia_catastro?: string
-  numero_portal_catastro?: string
+  id: string // Crucial for keys and linking
+  ndg?: string | null
+  lien?: string | null
+  property_id?: string | null
+  reference_code?: string | null
+  parcel?: string | null
+  cadastral_reference?: string | null
+  idufir?: string | null
+
+  property_type?: string | null
+  property_general_subtype?: string | null
+
+  provincia_catastro?: string | null
+  municipio_catastro?: string | null
+  tipo_via_catastro?: string | null
+  nombre_via_catastro?: string | null
+  numero_portal_catastro?: string | null
+  escalera_catastro?: string | null
+  planta_catastro?: string | null
+  puerta_catastro?: string | null
+  codigo_postal_catastro?: string | null
+  direccion_texto_catastro?: string | null // Full address text if available
+
+  superficie_construida_m2?: number | string | null // Can be string, ensure parsing
+  uso_predominante_inmueble?: string | null
+  ano_construccion_inmueble?: number | string | null // Can be string
+
+  rooms?: number | string | null // Can be string
+  bathrooms?: number | string | null // Can be string
+  has_parking?: boolean | null
+  extras?: string | string[] | null // Can be string or array
+
   gbv?: number | null
-  price_to_brokers?: number | null
-  fase_procedimiento?: string
-  cadastral_reference?: string
-  sqm?: number
-  municipio_catastro?: string
   auction_base?: number | null
-  escalera_catastro?: string
-  tipo_procedimiento?: string
-  superficie_construida_m2?: string
-  tipo_via_catastro?: string
-  hv?: number | null
-  auction_value?: number
-  uso_predominante_inmueble?: string
   deuda?: number | null
-  property_type?: string
+  DEUDA?: number | null // Alternative DEUDA field
+  auction_value?: number | null
   price_approx?: number | null
-  nombre_via_catastro?: string
-  precio_idealista_venta_m2?: number
+  price_to_brokers?: number | null
+  ob?: number | null
+  hv?: number | null
   purchase_price?: number | null
-  codigo_postal_catastro?: string
-  ob?: number
-  ano_construccion_inmueble?: string
-  reference_code?: string
-  DEUDA?: number | null
+  uw_value?: number | null
+  hipoges_value_total?: number | null
+
+  precio_idealista_venta_m2?: number | null
+  precio_idealista_alquiler_m2?: number | null
+
+  legal_type?: string | null
+  legal_phase?: string | null
+  tipo_procedimiento?: string | null
+  fase_procedimiento?: string | null
+  fase_actual?: string | null
+
+  registration_status?: string | null
+  working_status?: string | null
+  marketing_status?: string | null
+  marketing_suspended_reason?: string | null
+  estado_posesion_fisica?: string | null
+
+  closing_date?: Date | string | null
+  portfolio_closing_date?: Date | string | null
+  date_under_re_mgmt?: Date | string | null
+  fecha_subasta?: Date | string | null
+  fecha_cesion_remate?: Date | string | null
+
+  campania?: string | null
+  portfolio?: string | null
+  borrower_name?: string | null
+  hip_under_re_mgmt?: string | null
+
+  // Geo and images
+  latitude?: number | null
+  longitude?: number | null
+  images?: string[] | null // Array of image URLs
+
+  // Timestamps
+  createdAt?: Date | string | null
+  updatedAt?: Date | string | null
+
+  // Compatibility with older structure if needed
+  sqm?: number | null // Alias for superficie_construida_m2 if used elsewhere
 }
+
+// --- The rest of the file (AssetFilter, labels, formatters) remains the same ---
+// --- Make sure it's consistent with your previous version of types/asset.ts ---
 
 export interface AssetFilter {
   type?: string
@@ -61,6 +114,7 @@ export interface AssetFilter {
 // Mapeo de campos en español para mostrar en la UI
 export const fieldLabels: Record<string, string> = {
   // Identificadores
+  id: "ID",
   ndg: "NDG",
   lien: "Lien",
   property_id: "ID de Propiedad",
@@ -83,6 +137,7 @@ export const fieldLabels: Record<string, string> = {
   planta_catastro: "Planta",
   puerta_catastro: "Puerta",
   codigo_postal_catastro: "Código Postal",
+  direccion_texto_catastro: "Dirección Completa",
   superficie_construida_m2: "Superficie Construida (m²)",
   uso_predominante_inmueble: "Uso Predominante",
   ano_construccion_inmueble: "Año de Construcción",
@@ -131,17 +186,23 @@ export const fieldLabels: Record<string, string> = {
   date_under_re_mgmt: "Fecha Bajo Gestión",
   fecha_subasta: "Fecha de Subasta",
   fecha_cesion_remate: "Fecha de Cesión de Remate",
+  createdAt: "Fecha de Creación",
+  updatedAt: "Última Actualización",
 
   // Información adicional
   campania: "Campaña",
   portfolio: "Cartera",
   borrower_name: "Nombre del Prestatario",
   hip_under_re_mgmt: "Hipoteca Bajo Gestión",
+
+  // Geo
+  latitude: "Latitud",
+  longitude: "Longitud",
+  images: "Imágenes",
 }
 
 // Mapeo de tipos de propiedad para mostrar en español
 export const propertyTypeLabels: Record<string, string> = {
-  // Tipos adicionales solicitados
   vivienda_bloque_piso: "Vivienda en bloque/piso",
   vivienda_pareada: "Vivienda pareada",
   plaza_garaje: "Plaza de garaje",
@@ -170,8 +231,7 @@ export const marketingStatusLabels: Record<string, string> = {
   RENTED: "Alquilado",
   SUSPENDED: "Suspendido",
   PENDING: "Pendiente",
-  // Nuevos estados según la base de datos
-  Available: "Disponible",
+  Available: "Disponible", // Case variations
   Reserved: "Reservado",
   Sold: "Vendido",
   Rented: "Alquilado",
@@ -187,8 +247,7 @@ export const legalPhaseLabels: Record<string, string> = {
   POSSESSION: "Posesión",
   EVICTION: "Desahucio",
   CLOSED: "Cerrado",
-  // Nuevas fases según la base de datos
-  Foreclosure: "Ejecución Hipotecaria",
+  Foreclosure: "Ejecución Hipotecaria", // Case variations
   Auction: "Subasta",
   Adjudication: "Adjudicación",
   Possession: "Posesión",
@@ -197,29 +256,31 @@ export const legalPhaseLabels: Record<string, string> = {
 }
 
 // Función para formatear fechas en español
-export function formatDate(date?: Date): string {
-  if (!date) return "N/A"
+export function formatDate(dateInput?: Date | string | null): string {
+  if (!dateInput) return "N/A"
+  const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput
+  if (isNaN(date.getTime())) return "Fecha inválida"
   return new Intl.DateTimeFormat("es-ES", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-  }).format(date instanceof Date ? date : new Date(date))
+  }).format(date)
 }
 
 // Función para formatear valores monetarios en euros
-export function formatCurrency(value?: number): string {
+export function formatCurrency(value?: number | null): string {
   if (value === undefined || value === null) return "N/A"
   return new Intl.NumberFormat("es-ES", {
     style: "currency",
     currency: "EUR",
-    maximumFractionDigits: 0,
+    maximumFractionDigits: 0, // No decimals for simplicity, adjust if needed
   }).format(value)
 }
 
 // Función para generar un título descriptivo para la propiedad
 export function generateTitle(asset: Asset): string {
-  const type = propertyTypeLabels[asset.property_type] || asset.property_type
-  const location = asset.municipio_catastro || asset.provincia_catastro
+  const type = asset.property_type ? propertyTypeLabels[asset.property_type] || asset.property_type : "Propiedad"
+  const location = asset.municipio_catastro || asset.provincia_catastro || "Ubicación desconocida"
   const size = asset.superficie_construida_m2 ? `${asset.superficie_construida_m2}m²` : ""
 
   let title = `${type} en ${location}`
@@ -229,68 +290,52 @@ export function generateTitle(asset: Asset): string {
   return title
 }
 
+// Función para obtener la dirección completa usando SOLO campos catastrales
+export function getFullAddress(asset: Asset): string {
+  const components: string[] = []
+  if (asset.tipo_via_catastro && asset.nombre_via_catastro) {
+    components.push(`${asset.tipo_via_catastro} ${asset.nombre_via_catastro}`)
+  }
+  if (asset.numero_portal_catastro) components.push(asset.numero_portal_catastro)
+  if (asset.escalera_catastro) components.push(`Esc. ${asset.escalera_catastro}`)
+  if (asset.planta_catastro) components.push(`Planta ${asset.planta_catastro}`)
+  if (asset.puerta_catastro) components.push(`Puerta ${asset.puerta_catastro}`)
+  if (asset.codigo_postal_catastro) components.push(asset.codigo_postal_catastro)
+  if (asset.municipio_catastro) components.push(asset.municipio_catastro)
+  if (asset.provincia_catastro) components.push(asset.provincia_catastro)
+
+  if (components.length > 0) return components.join(", ")
+  if (asset.direccion_texto_catastro) return asset.direccion_texto_catastro
+  return "Dirección no disponible"
+}
+
 // Función para generar una descripción para la propiedad
 export function generateDescription(asset: Asset): string {
-  const type = propertyTypeLabels[asset.property_type] || asset.property_type
-
-  // Construir la dirección completa a partir de los datos catastrales
+  const type = asset.property_type ? propertyTypeLabels[asset.property_type] || asset.property_type : "Propiedad"
   const address = getFullAddress(asset)
-
-  let description = `${type} ubicado en ${address}, ${asset.municipio_catastro}, ${asset.provincia_catastro}.`
+  let description = `${type} ubicado en ${address}.`
 
   if (asset.superficie_construida_m2) description += ` Superficie construida de ${asset.superficie_construida_m2}m².`
   if (asset.rooms) description += ` ${asset.rooms} habitaciones.`
   if (asset.bathrooms) description += ` ${asset.bathrooms} baños.`
-  if (asset.extras) description += ` ${asset.extras}.`
-  if (asset.ano_construccion_inmueble && asset.ano_construccion_inmueble !== "0") {
+  if (asset.extras) {
+    const extrasText = Array.isArray(asset.extras) ? asset.extras.join(", ") : asset.extras
+    description += ` Extras: ${extrasText}.`
+  }
+  if (asset.ano_construccion_inmueble && asset.ano_construccion_inmueble.toString() !== "0") {
     description += ` Año de construcción: ${asset.ano_construccion_inmueble}.`
   }
-
   if (asset.legal_phase) {
     const phase = legalPhaseLabels[asset.legal_phase] || asset.legal_phase
     description += ` Actualmente en fase legal: ${phase}.`
   }
-
   return description
-}
-
-// Función para obtener la dirección completa usando SOLO campos catastrales
-export function getFullAddress(asset: Asset): string {
-  const components = []
-
-  // Construir dirección usando solo datos catastrales
-  if (asset.tipo_via_catastro && asset.nombre_via_catastro) {
-    components.push(`${asset.tipo_via_catastro} ${asset.nombre_via_catastro}`)
-  }
-
-  if (asset.numero_portal_catastro) {
-    components.push(asset.numero_portal_catastro)
-  }
-
-  if (asset.escalera_catastro) {
-    components.push(`Esc. ${asset.escalera_catastro}`)
-  }
-
-  if (asset.planta_catastro) {
-    components.push(`Planta ${asset.planta_catastro}`)
-  }
-
-  if (asset.puerta_catastro) {
-    components.push(`Puerta ${asset.puerta_catastro}`)
-  }
-
-  if (components.length > 0) {
-    return components.join(", ")
-  }
-
-  // Si no hay suficiente información, devolvemos un mensaje genérico
-  return "Dirección no disponible"
 }
 
 // Función para obtener la superficie como número
 export function getSuperficie(asset: Asset): number {
   if (!asset.superficie_construida_m2) return 0
-  const superficie = Number.parseFloat(asset.superficie_construida_m2.toString())
+  const superficie = Number.parseFloat(String(asset.superficie_construida_m2))
   return isNaN(superficie) ? 0 : superficie
 }
 

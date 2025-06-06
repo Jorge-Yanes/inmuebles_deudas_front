@@ -1,127 +1,76 @@
-import type { Asset } from "@/types/asset"
+import type { SearchFilters, SearchOptions, SearchResult } from "@/lib/search/vertex-ai-service" // Use types from Vertex service
 
-interface SearchFilters {
-  property_type?: string
-  provincia_catastro?: string
-  municipio_catastro?: string
-  price_min?: number
-  price_max?: number
-  surface_min?: number
-  surface_max?: number
-}
+export type { SearchFilters, SearchOptions, SearchResult } // Re-export types for convenience
 
-interface SearchOptions {
-  pageSize?: number
-  offset?: number
-}
-
-interface SearchResult {
-  assets: Asset[]
-  totalCount: number
-  facets: Record<string, Array<{ value: string; count: number }>>
-  searchTime: number
-}
-
+// Calls the enhanced Vertex AI-powered search API
 export async function searchAssets(
-  query = "",
+  query: string,
   filters: SearchFilters = {},
   options: SearchOptions = {},
 ): Promise<SearchResult> {
+  // Ensure return type matches SearchResult
   try {
-    const response = await fetch("/api/search", {
+    const response = await fetch("/api/search/enhanced", {
+      // Corrected endpoint
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        query,
-        filters,
-        pageSize: options.pageSize || 20,
-        offset: options.offset || 0,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, filters, options }),
     })
 
+    const responseData: SearchResult = await response.json()
+
     if (!response.ok) {
-      throw new Error(`Search API returned ${response.status}`)
+      // The API route now includes error type in the response
+      const errorType = responseData.errorType || (response.status === 429 ? "RateLimitError" : "GenericError")
+      const errorMessage = responseData.error || `Search API error: ${response.statusText}`
+      console.error(`Client searchAssets Error (${errorType}):`, errorMessage, responseData)
+      // Propagate a SearchResult-like structure with error info
+      return {
+        assets: [],
+        totalSize: 0,
+        facets: [],
+        searchTimeMs: 0,
+        error: errorMessage,
+        errorType: errorType as SearchResult["errorType"],
+      }
     }
-
-    const data = await response.json()
-
-    if (data.error) {
-      throw new Error(data.message || "Search failed")
-    }
-
-    return data
+    return responseData
   } catch (error) {
-    console.error("Error searching assets:", error)
-    throw new Error("Failed to fetch from search API")
+    // Catch network errors or issues with fetch itself
+    console.error("Client searchAssets Network/Fetch Error:", error)
+    return {
+      assets: [],
+      totalSize: 0,
+      facets: [],
+      searchTimeMs: 0,
+      error: error instanceof Error ? error.message : "A network error occurred during search.",
+      errorType: "GenericError",
+    }
   }
 }
 
-export async function getSearchSuggestions(query: string): Promise<string[]> {
+// Calls the enhanced Vertex AI-powered suggestions API
+export async function getSearchSuggestions(query: string, userPseudoId?: string): Promise<string[]> {
+  if (!query.trim()) return []
   try {
-    if (!query || query.length < 2) {
-      return []
+    const params = new URLSearchParams({ q: query })
+    if (userPseudoId) {
+      // Pass userPseudoId if available for better personalization
+      params.append("userPseudoId", userPseudoId)
     }
 
-    const response = await fetch(`/api/search/suggest?q=${encodeURIComponent(query)}`)
-
+    const response = await fetch(`/api/search/suggest/enhanced?${params.toString()}`) // Corrected endpoint
     if (!response.ok) {
-      console.error("Suggestion API error:", response.status)
-      return []
+      console.error(`Client getSearchSuggestions Error: ${response.status} ${response.statusText}`)
+      return [] // Return empty on error, don't break UI
     }
-
-    const data = await response.json()
-    return data.suggestions || []
+    const suggestions = await response.json()
+    return Array.isArray(suggestions) ? suggestions : []
   } catch (error) {
-    console.error("Error getting search suggestions:", error)
+    console.error("Client getSearchSuggestions Network/Fetch Error:", error)
     return []
   }
 }
 
-// Utility function to build search URL
-export function buildSearchUrl(query: string, filters: SearchFilters = {}): string {
-  const params = new URLSearchParams()
-
-  if (query.trim()) {
-    params.set("q", query.trim())
-  }
-
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
-      params.set(key, String(value))
-    }
-  })
-
-  return `/search${params.toString() ? `?${params.toString()}` : ""}`
-}
-
-// Utility function to parse search URL
-export function parseSearchUrl(searchParams: URLSearchParams): { query: string; filters: SearchFilters } {
-  const query = searchParams.get("q") || ""
-
-  const filters: SearchFilters = {}
-
-  const propertyType = searchParams.get("property_type")
-  if (propertyType) filters.property_type = propertyType
-
-  const provincia = searchParams.get("provincia_catastro")
-  if (provincia) filters.provincia_catastro = provincia
-
-  const municipio = searchParams.get("municipio_catastro")
-  if (municipio) filters.municipio_catastro = municipio
-
-  const priceMin = searchParams.get("price_min")
-  if (priceMin) filters.price_min = Number(priceMin)
-
-  const priceMax = searchParams.get("price_max")
-  if (priceMax) filters.price_max = Number(priceMax)
-
-  const surfaceMin = searchParams.get("surface_min")
-  if (surfaceMin) filters.surface_min = Number(surfaceMin)
-
-  const surfaceMax = searchParams.get("surface_max")
-  if (surfaceMax) filters.surface_max = Number(surfaceMax)
-
-  return { query, filters }
-}
+// --- Other utility functions like buildSearchUrl, parseSearchUrl can remain if still used by UI ---
+// --- but ensure they align with the SearchFilters and SearchOptions types ---

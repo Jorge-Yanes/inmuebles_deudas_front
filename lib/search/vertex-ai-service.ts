@@ -1,364 +1,350 @@
 import { v1 } from "@google-cloud/discoveryengine"
-import type { Asset } from "@/types/asset"
+import type { Asset } from "@/types/asset" // Ensure this Asset type is comprehensive
 
-interface SearchConfig {
+const MAX_REQUESTS_PER_MINUTE = 280 // Slightly below the 300 limit for buffer
+const REQUEST_WINDOW_MS = 60 * 1000 // 1 minute
+
+class RateLimitError extends Error {
+  constructor(message = "Search request quota exceeded. Please try again shortly.") {
+    super(message)
+    this.name = "RateLimitError"
+  }
+}
+
+interface VertexAISearchConfig {
   projectId: string
   location: string
   dataStoreId: string
-  servingConfig: string
+  servingConfigId: string // Changed from servingConfig to servingConfigId for clarity
 }
 
-interface SearchFilters {
-  property_type?: string
-  provincia_catastro?: string
-  municipio_catastro?: string
-  price_range?: { min?: number; max?: number }
-  surface_range?: { min?: number; max?: number }
-  legal_phase?: string
-  marketing_status?: string
-  construction_year_range?: { min?: number; max?: number }
-  rooms?: number
-  bathrooms?: number
-  has_parking?: boolean
+export interface SearchFilters {
+  property_type?: string | string[]
+  provincia_catastro?: string | string[]
+  municipio_catastro?: string | string[]
+  price_min?: number
+  price_max?: number
+  surface_min?: number // Assuming superficie_construida_m2 is numeric in Vertex AI
+  surface_max?: number
+  rooms_min?: number // Assuming rooms is numeric
+  bathrooms_min?: number // Assuming bathrooms is numeric
+  construction_year_min?: number // Assuming ano_construccion_inmueble is numeric
+  construction_year_max?: number
+  legal_phase?: string | string[]
+  marketing_status?: string | string[]
+  // Add other filterable fields as needed, e.g., has_parking?: boolean
 }
 
-interface SearchOptions {
+export interface SearchOptions {
   pageSize?: number
-  offset?: number
-  sortBy?: "relevance" | "price_asc" | "price_desc" | "date_desc"
-  facets?: string[]
+  pageToken?: string // Vertex AI uses pageToken for pagination
+  offset?: number // Can also be used, but pageToken is generally preferred
+  sortBy?: string // e.g., "price_approx asc", "ano_construccion_inmueble desc"
+  facetKeys?: string[]
+  userPseudoId?: string // For analytics and personalization
 }
 
-interface SearchResult {
+export interface SearchResult {
   assets: Asset[]
-  totalCount: number
-  facets: Record<string, Array<{ value: string; count: number }>>
-  suggestions?: string[]
-  searchTime: number
+  totalSize: number
+  facets: Array<{
+    key: string
+    values: Array<{ value: string | { interval: { minValue?: number; maxValue?: number } }; count: number }>
+  }>
+  nextPageToken?: string
+  correctedQuery?: string
+  appliedQuery?: string // The query that was actually used by the engine
+  searchTimeMs: number
+  error?: string // Optional error message for UI
+  errorType?: "RateLimitError" | "SearchError" | "GenericError"
 }
 
 export class VertexAISearchService {
   private client: v1.SearchServiceClient
-  private config: SearchConfig
+  private servingConfigPath: string
+  private requestTimestamps: number[] = []
 
-  constructor(config: SearchConfig) {
+  constructor(config: VertexAISearchConfig) {
+    if (!config.projectId || !config.location || !config.dataStoreId || !config.servingConfigId) {
+      console.error("Vertex AI Search configuration is incomplete:", config)
+      throw new Error(
+        "Vertex AI Search configuration is incomplete. Please check environment variables: VERTEX_AI_PROJECT_ID, VERTEX_AI_LOCATION, VERTEX_AI_DATA_STORE_ID, VERTEX_AI_SERVING_CONFIG_ID",
+      )
+    }
     this.client = new v1.SearchServiceClient()
-    this.config = config
+    // Correctly construct the servingConfigPath
+    this.servingConfigPath = `projects/${config.projectId}/locations/${config.location}/collections/default_collection/dataStores/${config.dataStoreId}/servingConfigs/${config.servingConfigId}`
+    // If not using 'default_collection', adjust accordingly or use:
+    // this.client.projectLocationDataStoreServingConfigPath(config.projectId, config.location, config.dataStoreId, config.servingConfigId)
+    // However, the above helper might not work if you have a specific collection. The string path is often more reliable.
+    console.log("Vertex AI Serving Config Path:", this.servingConfigPath)
   }
 
-  /**
-   * Enhanced search with Vertex AI Search
-   */
+  private async checkRateLimit(): Promise<void> {
+    const now = Date.now()
+    this.requestTimestamps = this.requestTimestamps.filter((timestamp) => now - timestamp < REQUEST_WINDOW_MS)
+
+    if (this.requestTimestamps.length >= MAX_REQUESTS_PER_MINUTE) {
+      console.warn(`Vertex AI Search: Rate limit nearly exceeded. ${this.requestTimestamps.length} requests in window.`)
+      throw new RateLimitError()
+    }
+    this.requestTimestamps.push(now)
+  }
+
+  private buildFilterString(filters: SearchFilters): string {
+    const conditions: string[] = []
+    for (const [key, value] of Object.entries(filters)) {
+      if (value === undefined || value === null || (Array.isArray(value) && value.length === 0) || value === "")
+        continue
+
+      const fieldName = key
+        .replace("_min", "")
+        .replace("_max", "")
+        // Map UI filter keys to Vertex AI schema field names if they differ
+        .replace("surface", "superficie_construida_m2")
+        .replace("construction_year", "ano_construccion_inmueble")
+        .replace("price", "price_approx") // Assuming price_approx is the numeric field for price range
+
+      if (key.endsWith("_min")) {
+        conditions.push(`${fieldName} >= ${value}`)
+      } else if (key.endsWith("_max")) {
+        conditions.push(`${fieldName} <= ${value}`)
+      } else if (Array.isArray(value)) {
+        // For array fields, use OR logic for multiple selections of the same facet
+        conditions.push(`(${value.map((v) => `${fieldName}: ANY("${v}")`).join(" OR ")})`)
+      } else {
+        conditions.push(`${fieldName}: ANY("${value}")`)
+      }
+    }
+    const filterStr = conditions.join(" AND ")
+    console.log("Vertex AI Filter String:", filterStr)
+    return filterStr
+  }
+
+  private extractFieldValue(field: any): any {
+    if (field === null || field === undefined) return null
+    if (field.stringValue !== undefined && field.stringValue !== null) return field.stringValue
+    if (field.numberValue !== undefined && field.numberValue !== null) return field.numberValue
+    if (field.boolValue !== undefined && field.boolValue !== null) return field.boolValue
+    if (field.listValue && field.listValue.values && field.listValue.values.length > 0) {
+      return field.listValue.values.map((v: any) => this.extractFieldValue(v))
+    }
+    if (field.structValue && field.structValue.fields) {
+      const nestedObject: { [key: string]: any } = {}
+      for (const key in field.structValue.fields) {
+        nestedObject[key] = this.extractFieldValue(field.structValue.fields[key])
+      }
+      return nestedObject
+    }
+    return null // Default to null if no value type matches
+  }
+
+  private mapDocumentToAsset(doc: any): Asset {
+    const rawData = doc.structData?.fields
+      ? Object.fromEntries(Object.entries(doc.structData.fields).map(([k, v]) => [k, this.extractFieldValue(v)]))
+      : doc.jsonData
+        ? JSON.parse(doc.jsonData)
+        : {}
+
+    // Helper to safely parse numbers that might come as strings
+    const safeParseFloat = (val: any): number | null => {
+      if (val === null || val === undefined) return null
+      const num = Number.parseFloat(String(val))
+      return isNaN(num) ? null : num
+    }
+    const safeParseInt = (val: any): number | null => {
+      if (val === null || val === undefined) return null
+      const num = Number.parseInt(String(val), 10)
+      return isNaN(num) ? null : num
+    }
+    const safeParseDate = (val: any): Date | null => {
+      if (!val) return null
+      const date = new Date(val)
+      return isNaN(date.getTime()) ? null : date
+    }
+
+    const asset: Asset = {
+      id: doc.id || rawData.id || crypto.randomUUID(), // Ensure ID exists
+      ndg: rawData.ndg ?? null,
+      lien: rawData.lien ?? null,
+      property_id: rawData.property_id ?? null,
+      reference_code: rawData.reference_code ?? null,
+      parcel: rawData.parcel ?? null,
+      cadastral_reference: rawData.cadastral_reference ?? null,
+      idufir: rawData.idufir ?? null,
+      property_type: rawData.property_type ?? null,
+      property_general_subtype: rawData.property_general_subtype ?? null,
+      provincia_catastro: rawData.provincia_catastro ?? null,
+      municipio_catastro: rawData.municipio_catastro ?? null,
+      tipo_via_catastro: rawData.tipo_via_catastro ?? null,
+      nombre_via_catastro: rawData.nombre_via_catastro ?? null,
+      numero_portal_catastro: rawData.numero_portal_catastro ?? null,
+      escalera_catastro: rawData.escalera_catastro ?? null,
+      planta_catastro: rawData.planta_catastro ?? null,
+      puerta_catastro: rawData.puerta_catastro ?? null,
+      codigo_postal_catastro: rawData.codigo_postal_catastro ?? null,
+      direccion_texto_catastro: rawData.direccion_texto_catastro ?? null,
+      superficie_construida_m2:
+        safeParseFloat(rawData.superficie_construida_m2) ?? rawData.superficie_construida_m2 ?? null,
+      sqm: safeParseFloat(rawData.sqm) ?? safeParseFloat(rawData.superficie_construida_m2) ?? null,
+      uso_predominante_inmueble: rawData.uso_predominante_inmueble ?? null,
+      ano_construccion_inmueble:
+        safeParseInt(rawData.ano_construccion_inmueble) ?? rawData.ano_construccion_inmueble ?? null,
+      rooms: safeParseInt(rawData.rooms) ?? rawData.rooms ?? null,
+      bathrooms: safeParseInt(rawData.bathrooms) ?? rawData.bathrooms ?? null,
+      has_parking: typeof rawData.has_parking === "boolean" ? rawData.has_parking : null,
+      extras: rawData.extras ?? null,
+      gbv: safeParseFloat(rawData.gbv) ?? null,
+      auction_base: safeParseFloat(rawData.auction_base) ?? null,
+      deuda: safeParseFloat(rawData.deuda) ?? null,
+      DEUDA: safeParseFloat(rawData.DEUDA) ?? safeParseFloat(rawData.deuda) ?? null,
+      auction_value: safeParseFloat(rawData.auction_value) ?? null,
+      price_approx: safeParseFloat(rawData.price_approx) ?? null,
+      price_to_brokers: safeParseFloat(rawData.price_to_brokers) ?? null,
+      ob: safeParseFloat(rawData.ob) ?? null,
+      hv: safeParseFloat(rawData.hv) ?? null,
+      purchase_price: safeParseFloat(rawData.purchase_price) ?? null,
+      uw_value: safeParseFloat(rawData.uw_value) ?? null,
+      hipoges_value_total: safeParseFloat(rawData.hipoges_value_total) ?? null,
+      precio_idealista_venta_m2: safeParseFloat(rawData.precio_idealista_venta_m2) ?? null,
+      precio_idealista_alquiler_m2: safeParseFloat(rawData.precio_idealista_alquiler_m2) ?? null,
+      legal_type: rawData.legal_type ?? null,
+      legal_phase: rawData.legal_phase ?? null,
+      tipo_procedimiento: rawData.tipo_procedimiento ?? null,
+      fase_procedimiento: rawData.fase_procedimiento ?? null,
+      fase_actual: rawData.fase_actual ?? null,
+      registration_status: rawData.registration_status ?? null,
+      working_status: rawData.working_status ?? null,
+      marketing_status: rawData.marketing_status ?? null,
+      marketing_suspended_reason: rawData.marketing_suspended_reason ?? null,
+      estado_posesion_fisica: rawData.estado_posesion_fisica ?? null,
+      closing_date: safeParseDate(rawData.closing_date),
+      portfolio_closing_date: safeParseDate(rawData.portfolio_closing_date),
+      date_under_re_mgmt: safeParseDate(rawData.date_under_re_mgmt),
+      fecha_subasta: safeParseDate(rawData.fecha_subasta),
+      fecha_cesion_remate: safeParseDate(rawData.fecha_cesion_remate),
+      campania: rawData.campania ?? null,
+      portfolio: rawData.portfolio ?? null,
+      borrower_name: rawData.borrower_name ?? null,
+      hip_under_re_mgmt: rawData.hip_under_re_mgmt ?? null,
+      latitude: safeParseFloat(rawData.latitude) ?? null,
+      longitude: safeParseFloat(rawData.longitude) ?? null,
+      images: Array.isArray(rawData.images) ? rawData.images.filter((img) => typeof img === "string") : [],
+      createdAt: safeParseDate(rawData.createdAt) ?? new Date(),
+      updatedAt: safeParseDate(rawData.updatedAt) ?? new Date(),
+    }
+    return asset
+  }
+
   async search(query: string, filters: SearchFilters = {}, options: SearchOptions = {}): Promise<SearchResult> {
+    await this.checkRateLimit()
     const startTime = Date.now()
+    const filterString = this.buildFilterString(filters)
+
+    const request: v1.ISearchRequest = {
+      servingConfig: this.servingConfigPath,
+      query: query || (filterString ? "*" : ""), // Use "*" if query is empty but filters are present, else empty for no query/no filter
+      filter: filterString || undefined, // Pass undefined if empty
+      pageSize: options.pageSize || 20,
+      pageToken: options.pageToken,
+      offset: !options.pageToken ? options.offset : undefined, // Only use offset if pageToken is not present
+      orderBy: options.sortBy,
+      facetSpecs: options.facetKeys?.map((key) => ({ facetKey: { key, caseInsensitive: true }, limit: 20 })), // Added caseInsensitive and limit
+      userPseudoId: options.userPseudoId || "anonymous-user",
+      queryExpansionSpec: { condition: "AUTO" },
+      spellCorrectionSpec: { mode: "AUTO" },
+      // contentSearchSpec: { snippetSpec: { returnSnippet: true } } // Example: if you need snippets
+    }
+    console.log("Vertex AI Search Request:", JSON.stringify(request, null, 2))
 
     try {
-      const searchRequest = this.buildSearchRequest(query, filters, options)
-
-      const [response] = await this.client.search(searchRequest)
-
-      const assets = this.parseSearchResults(response.results || [])
-      const facets = this.parseFacets(response.facets || [])
-      const totalCount = response.totalSize || 0
+      const [response] = await this.client.search(request)
+      console.log("Vertex AI Search Response:", JSON.stringify(response, null, 2))
+      const assets = (response.results || []).map((result) => this.mapDocumentToAsset(result.document!))
 
       return {
         assets,
-        totalCount,
-        facets,
-        searchTime: Date.now() - startTime,
+        totalSize: response.totalSize || 0,
+        facets: (response.facets || []).map((f) => ({
+          key: f.key!,
+          values: (f.values || []).map((v) => ({
+            value:
+              v.value ||
+              (v.interval ? { interval: { minValue: v.interval.minValue, maxValue: v.interval.maxValue } } : "unknown"),
+            count: Number(v.count) || 0,
+          })),
+        })),
+        nextPageToken: response.nextPageToken || undefined,
+        correctedQuery: response.correctedQuery || undefined,
+        appliedQuery: response.query || undefined,
+        searchTimeMs: Date.now() - startTime,
       }
-    } catch (error) {
-      console.error("Vertex AI Search error:", error)
-      throw new Error("Search service unavailable")
+    } catch (error: any) {
+      console.error("Vertex AI Search Client Error:", error)
+      if (
+        error.message?.includes("RESOURCE_EXHAUSTED") ||
+        error.code === 8 ||
+        error.message?.includes("Quota exceeded")
+      ) {
+        throw new RateLimitError(
+          `Vertex AI Search service is temporarily busy (Quota Exceeded). Please try again. Details: ${error.details || error.message}`,
+        )
+      }
+      throw new Error(`Search failed: ${error.details || error.message}`)
     }
   }
 
-  /**
-   * Get search suggestions/autocomplete
-   */
-  async getSuggestions(query: string, limit = 10): Promise<string[]> {
+  async getSuggestions(query: string, userPseudoId = "anonymous-user"): Promise<string[]> {
+    if (!query.trim()) return []
+    // Suggestions might have a different, often higher, quota.
+    // For now, we use the same rate limiter but this could be adjusted.
+    // await this.checkRateLimit(); // Decide if suggestions need same strict rate limiting
+
+    const request: v1.ICompleteQueryRequest = {
+      dataStore: `projects/${process.env.VERTEX_AI_PROJECT_ID}/locations/${process.env.VERTEX_AI_LOCATION}/dataStores/${process.env.VERTEX_AI_DATA_STORE_ID}`,
+      // servingConfig: this.servingConfigPath, // Not typically used for completeQuery with dataStore path
+      query: query,
+      userPseudoId: userPseudoId,
+      queryModel: "browse", // 'document' or 'browse'
+      maxSuggestions: 10,
+    }
+    console.log("Vertex AI Suggestion Request:", JSON.stringify(request, null, 2))
+
     try {
-      const request = {
-        servingConfig: this.config.servingConfig,
-        query,
-        queryModel: "searchSuggestions",
-        userPseudoId: "anonymous-user",
-        maxSuggestions: limit,
-      }
-
       const [response] = await this.client.completeQuery(request)
-
-      return response.querySuggestions?.map((s) => s.suggestion || "") || []
-    } catch (error) {
-      console.error("Suggestions error:", error)
+      console.log("Vertex AI Suggestion Response:", JSON.stringify(response, null, 2))
+      return (response.querySuggestions?.map((s) => s.suggestion).filter(Boolean) as string[]) || []
+    } catch (error: any) {
+      console.error("Vertex AI Suggestion Client Error:", error)
+      if (error.message?.includes("RESOURCE_EXHAUSTED") || error.code === 8) {
+        // Don't throw RateLimitError for suggestions to keep UI smoother, just return empty
+        console.warn("Vertex AI Suggestion rate limit likely hit.")
+        return []
+      }
+      // Don't throw, just return empty suggestions on other errors too
       return []
     }
   }
-
-  /**
-   * Build comprehensive search request
-   */
-  private buildSearchRequest(query: string, filters: SearchFilters, options: SearchOptions) {
-    const request: any = {
-      servingConfig: this.config.servingConfig,
-      query: query || "*", // Use wildcard for filter-only searches
-      pageSize: options.pageSize || 20,
-      offset: options.offset || 0,
-      queryExpansionSpec: { condition: "AUTO" },
-      spellCorrectionSpec: { mode: "AUTO" },
-      boostSpec: this.buildBoostSpec(),
-      facetSpecs: this.buildFacetSpecs(options.facets),
-    }
-
-    // Add filters
-    const filterExpression = this.buildFilterExpression(filters)
-    if (filterExpression) {
-      request.filter = filterExpression
-    }
-
-    // Add sorting
-    if (options.sortBy && options.sortBy !== "relevance") {
-      request.orderBy = this.buildOrderBy(options.sortBy)
-    }
-
-    return request
-  }
-
-  /**
-   * Build filter expression for Vertex AI Search
-   */
-  private buildFilterExpression(filters: SearchFilters): string {
-    const conditions: string[] = []
-
-    // Exact match filters
-    if (filters.property_type) {
-      conditions.push(`property_type = "${filters.property_type}"`)
-    }
-
-    if (filters.provincia_catastro) {
-      conditions.push(`provincia_catastro = "${filters.provincia_catastro}"`)
-    }
-
-    if (filters.municipio_catastro) {
-      conditions.push(`municipio_catastro = "${filters.municipio_catastro}"`)
-    }
-
-    if (filters.legal_phase) {
-      conditions.push(`legal_phase = "${filters.legal_phase}"`)
-    }
-
-    if (filters.marketing_status) {
-      conditions.push(`marketing_status = "${filters.marketing_status}"`)
-    }
-
-    // Range filters
-    if (filters.price_range) {
-      if (filters.price_range.min) {
-        conditions.push(`price_approx >= ${filters.price_range.min}`)
-      }
-      if (filters.price_range.max) {
-        conditions.push(`price_approx <= ${filters.price_range.max}`)
-      }
-    }
-
-    if (filters.surface_range) {
-      if (filters.surface_range.min) {
-        conditions.push(`superficie_construida_m2 >= ${filters.surface_range.min}`)
-      }
-      if (filters.surface_range.max) {
-        conditions.push(`superficie_construida_m2 <= ${filters.surface_range.max}`)
-      }
-    }
-
-    if (filters.construction_year_range) {
-      if (filters.construction_year_range.min) {
-        conditions.push(`ano_construccion_inmueble >= ${filters.construction_year_range.min}`)
-      }
-      if (filters.construction_year_range.max) {
-        conditions.push(`ano_construccion_inmueble <= ${filters.construction_year_range.max}`)
-      }
-    }
-
-    // Numeric filters
-    if (filters.rooms) {
-      conditions.push(`rooms >= ${filters.rooms}`)
-    }
-
-    if (filters.bathrooms) {
-      conditions.push(`bathrooms >= ${filters.bathrooms}`)
-    }
-
-    if (filters.has_parking !== undefined) {
-      conditions.push(`has_parking = ${filters.has_parking}`)
-    }
-
-    return conditions.join(" AND ")
-  }
-
-  /**
-   * Build boost specification for relevance ranking
-   */
-  private buildBoostSpec() {
-    return {
-      conditionBoostSpecs: [
-        {
-          condition: 'marketing_status = "Available"',
-          boost: 2.0,
-        },
-        {
-          condition: "price_approx > 0",
-          boost: 1.5,
-        },
-        {
-          condition: "superficie_construida_m2 > 0",
-          boost: 1.3,
-        },
-      ],
-    }
-  }
-
-  /**
-   * Build facet specifications
-   */
-  private buildFacetSpecs(requestedFacets?: string[]) {
-    const defaultFacets = [
-      "property_type",
-      "provincia_catastro",
-      "municipio_catastro",
-      "legal_phase",
-      "marketing_status",
-      "rooms",
-      "bathrooms",
-    ]
-
-    const facets = requestedFacets || defaultFacets
-
-    return facets.map((facet) => ({
-      facetKey: {
-        key: facet,
-        intervals:
-          facet.includes("price") || facet.includes("superficie")
-            ? [
-                { minimum: 0, maximum: 100000 },
-                { minimum: 100000, maximum: 300000 },
-                { minimum: 300000, maximum: 500000 },
-                { minimum: 500000 },
-              ]
-            : undefined,
-      },
-      limit: 20,
-      excludedFilterKeys: [facet],
-    }))
-  }
-
-  /**
-   * Build order by clause
-   */
-  private buildOrderBy(sortBy: string): string {
-    switch (sortBy) {
-      case "price_asc":
-        return "price_approx asc"
-      case "price_desc":
-        return "price_approx desc"
-      case "date_desc":
-        return "createdAt desc"
-      default:
-        return ""
-    }
-  }
-
-  /**
-   * Parse search results into Asset objects
-   */
-  private parseSearchResults(results: any[]): Asset[] {
-    return results
-      .map((result) => {
-        const document = result.document
-        let data: any = {}
-
-        if (document?.structData?.fields) {
-          // Parse structured data
-          for (const [fieldName, field] of Object.entries(document.structData.fields)) {
-            data[fieldName] = this.extractFieldValue(field)
-          }
-        } else if (document?.content?.jsonData) {
-          try {
-            data = JSON.parse(document.content.jsonData)
-          } catch (e) {
-            console.warn("Failed to parse JSON data:", e)
-          }
-        }
-
-        return this.mapToAsset(data, document?.id)
-      })
-      .filter(Boolean)
-  }
-
-  /**
-   * Extract field value from Vertex AI Search response
-   */
-  private extractFieldValue(field: any): any {
-    if ("stringValue" in field) return field.stringValue
-    if ("numberValue" in field) return field.numberValue
-    if ("boolValue" in field) return field.boolValue
-    if ("listValue" in field) {
-      return field.listValue?.values?.map((v: any) => this.extractFieldValue(v)) || []
-    }
-    return null
-  }
-
-  /**
-   * Map raw data to Asset interface
-   */
-  private mapToAsset(data: any, id?: string): Asset | null {
-    try {
-      return {
-        id: id || data.id,
-        ndg: data.ndg || "",
-        property_type: data.property_type || data["Property Type"],
-        provincia_catastro: data.provincia_catastro,
-        municipio_catastro: data.municipio_catastro,
-        tipo_via_catastro: data.tipo_via_catastro,
-        nombre_via_catastro: data.nombre_via_catastro,
-        numero_portal_catastro: data.numero_portal_catastro,
-        codigo_postal_catastro: data.codigo_postal_catastro,
-        superficie_construida_m2: data.superficie_construida_m2,
-        price_approx: Number.parseFloat(data.price_approx) || null,
-        precio_idealista_venta_m2: Number.parseFloat(data.precio_idealista_venta_m2) || undefined,
-        precio_idealista_alquiler_m2: Number.parseFloat(data.precio_idealista_alquiler_m2) || undefined,
-        legal_phase: data.legal_phase,
-        marketing_status: data.marketing_status,
-        rooms: data.rooms,
-        bathrooms: data.bathrooms,
-        has_parking: data.has_parking,
-        ano_construccion_inmueble: data.ano_construccion_inmueble,
-        cadastral_reference: data.cadastral_reference,
-        reference_code: data.reference_code,
-        // Add other fields as needed
-      } as Asset
-    } catch (error) {
-      console.error("Error mapping asset:", error)
-      return null
-    }
-  }
-
-  /**
-   * Parse facets from search response
-   */
-  private parseFacets(facets: any[]): Record<string, Array<{ value: string; count: number }>> {
-    const result: Record<string, Array<{ value: string; count: number }>> = {}
-
-    facets.forEach((facet) => {
-      const key = facet.key
-      const values =
-        facet.values?.map((v: any) => ({
-          value: v.value,
-          count: v.count || 0,
-        })) || []
-
-      result[key] = values
-    })
-
-    return result
-  }
 }
+
+// Singleton instance
+let vertexAISearchServiceInstance: VertexAISearchService | null = null
+
+export function getVertexAISearchService(): VertexAISearchService {
+  if (!vertexAISearchServiceInstance) {
+    try {
+      vertexAISearchServiceInstance = new VertexAISearchService({
+        projectId: process.env.VERTEX_AI_PROJECT_ID!,
+        location: process.env.VERTEX_AI_LOCATION!, // Ensure this is set
+        dataStoreId: process.env.VERTEX_AI_DATA_STORE_ID!,
+        servingConfigId: process.env.VERTEX_AI_SERVING_CONFIG_ID!, // Ensure this is set
+      })
+    } catch (error) {
+      console.error("Failed to initialize VertexAISearchService:", error)
+      throw error // Re-throw to make it clear initialization failed
+    }
+  }
+  return vertexAISearchServiceInstance
+}
+
+export { RateLimitError } // Export the custom error

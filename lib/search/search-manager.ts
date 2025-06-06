@@ -1,150 +1,127 @@
-import { VertexAISearchService } from "./vertex-ai-service"
-import { getAllProperties } from "@/lib/firestore/property-service"
+// This file might become simpler or be removed if VertexAISearchService is used directly by API routes.
+// For now, let's assume it's still used to potentially switch strategies.
+import {
+  type VertexAISearchService,
+  getVertexAISearchService,
+  RateLimitError,
+  type SearchResult,
+  type SearchFilters,
+  type SearchOptions,
+} from "./vertex-ai-service"
+import { getAllProperties } from "@/lib/firestore/property-service" // Fallback
 
 interface SearchStrategy {
-  search(query: string, filters: any, options: any): Promise<any>
+  search(query: string, filters: SearchFilters, options: SearchOptions): Promise<SearchResult>
+  getSuggestions(query: string, userPseudoId?: string): Promise<string[]>
 }
 
 class FirestoreSearchStrategy implements SearchStrategy {
-  async search(query: string, filters: any, options: any) {
-    // Fallback to existing Firestore search
-    const allProperties = await getAllProperties(1000)
-
-    let results = allProperties
-
-    // Apply text search
-    if (query.trim()) {
-      const normalizedQuery = query.toLowerCase()
-      results = results.filter((asset) => {
-        const searchableText = [
-          asset.provincia_catastro,
-          asset.municipio_catastro,
-          asset.tipo_via_catastro,
-          asset.nombre_via_catastro,
-          asset.property_type,
-          asset.reference_code,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-
-        return searchableText.includes(normalizedQuery)
-      })
-    }
-
-    // Apply filters
-    if (filters.property_type) {
-      results = results.filter((asset) => asset.property_type === filters.property_type)
-    }
-
-    if (filters.provincia_catastro) {
-      results = results.filter((asset) => asset.provincia_catastro === filters.provincia_catastro)
-    }
-
-    // Add more filter logic...
-
+  // Basic Firestore fallback (simplified, as Vertex AI is primary)
+  async search(query: string, filters: SearchFilters, options: SearchOptions): Promise<SearchResult> {
+    console.warn("Using Firestore fallback search strategy.")
+    const allProperties = await getAllProperties(options.pageSize || 20) // Simple limit for fallback
+    // Implement basic filtering if needed for fallback
     return {
-      assets: results.slice(0, options.pageSize || 20),
-      totalCount: results.length,
-      facets: {},
-      searchTime: 0,
+      assets: allProperties,
+      totalSize: allProperties.length, // This would be an estimate or require another query
+      facets: [],
+      searchTimeMs: 0,
     }
+  }
+  async getSuggestions(query: string): Promise<string[]> {
+    console.warn("Using Firestore fallback suggestions.")
+    // Basic fallback suggestions
+    const common = ["Madrid", "Barcelona", "Piso", "Casa"]
+    return common.filter((s) => s.toLowerCase().includes(query.toLowerCase())).slice(0, 5)
   }
 }
 
-class VertexAISearchStrategy implements SearchStrategy {
+class VertexAISearchStrategyImpl implements SearchStrategy {
   private vertexService: VertexAISearchService
 
   constructor() {
-    this.vertexService = new VertexAISearchService({
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
-      location: "global",
-      dataStoreId: process.env.VERTEX_AI_SEARCH_DATA_STORE_ID!,
-      servingConfig: `projects/${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}/locations/global/collections/default_collection/dataStores/${process.env.VERTEX_AI_SEARCH_DATA_STORE_ID}/servingConfigs/default_serving_config`,
-    })
+    this.vertexService = getVertexAISearchService()
   }
 
-  async search(query: string, filters: any, options: any) {
-    return await this.vertexService.search(query, filters, options)
+  async search(query: string, filters: SearchFilters, options: SearchOptions): Promise<SearchResult> {
+    return this.vertexService.search(query, filters, options)
+  }
+
+  async getSuggestions(query: string, userPseudoId?: string): Promise<string[]> {
+    return this.vertexService.getSuggestions(query, userPseudoId)
   }
 }
 
 export class SearchManager {
-  private primaryStrategy: SearchStrategy
-  private fallbackStrategy: SearchStrategy
-  private useVertexAI: boolean
+  private strategy: SearchStrategy
 
   constructor(useVertexAI = true) {
-    this.useVertexAI = useVertexAI
-    this.primaryStrategy = useVertexAI ? new VertexAISearchStrategy() : new FirestoreSearchStrategy()
-    this.fallbackStrategy = new FirestoreSearchStrategy()
+    // Forcing Vertex AI, but keeping structure for potential future fallback toggle
+    if (useVertexAI && process.env.VERTEX_AI_PROJECT_ID) {
+      try {
+        this.strategy = new VertexAISearchStrategyImpl()
+        console.log("SearchManager initialized with VertexAISearchStrategy.")
+      } catch (error) {
+        console.error("Failed to initialize VertexAISearchStrategy, falling back to Firestore:", error)
+        this.strategy = new FirestoreSearchStrategy()
+      }
+    } else {
+      console.warn("Vertex AI not configured, SearchManager falling back to Firestore.")
+      this.strategy = new FirestoreSearchStrategy()
+    }
   }
 
-  async search(query: string, filters: any = {}, options: any = {}) {
+  async search(query: string, filters: SearchFilters = {}, options: SearchOptions = {}): Promise<SearchResult> {
+    const startTime = Date.now()
     try {
-      // Try primary strategy first
-      const result = await this.primaryStrategy.search(query, filters, options)
-
-      // Log search analytics
-      this.logSearchAnalytics(query, filters, result, "primary")
-
+      const result = await this.strategy.search(query, filters, options)
+      this.logSearchAnalytics(query, filters, result, this.strategy.constructor.name)
       return result
     } catch (error) {
-      console.error("Primary search strategy failed:", error)
-
-      // Fallback to secondary strategy
-      try {
-        const result = await this.fallbackStrategy.search(query, filters, options)
-        this.logSearchAnalytics(query, filters, result, "fallback")
-        return result
-      } catch (fallbackError) {
-        console.error("Fallback search strategy failed:", fallbackError)
-        throw new Error("Search service unavailable")
+      console.error(`SearchManager: ${this.strategy.constructor.name} search failed:`, error)
+      // If primary (Vertex) fails, could consider an explicit fallback here if not handled by constructor logic
+      // For now, rethrow to be handled by the API route
+      if (error instanceof RateLimitError) {
+        // Propagate RateLimitError specifically
+        return {
+          assets: [],
+          totalSize: 0,
+          facets: [],
+          searchTimeMs: Date.now() - startTime,
+          error: error.message,
+          errorType: "RateLimitError",
+        }
+      }
+      return {
+        assets: [],
+        totalSize: 0,
+        facets: [],
+        searchTimeMs: Date.now() - startTime,
+        error: error instanceof Error ? error.message : "Unknown search error",
+        errorType: "SearchError",
       }
     }
   }
 
-  async getSuggestions(query: string): Promise<string[]> {
-    if (this.useVertexAI && this.primaryStrategy instanceof VertexAISearchStrategy) {
-      try {
-        return await (this.primaryStrategy as any).vertexService.getSuggestions(query)
-      } catch (error) {
-        console.error("Suggestions failed:", error)
-      }
+  async getSuggestions(query: string, userPseudoId?: string): Promise<string[]> {
+    try {
+      return await this.strategy.getSuggestions(query, userPseudoId)
+    } catch (error) {
+      console.error(`SearchManager: ${this.strategy.constructor.name} suggestions failed:`, error)
+      return [] // Return empty on suggestion error
     }
-
-    // Fallback suggestions logic
-    return this.generateFallbackSuggestions(query)
   }
 
-  private async generateFallbackSuggestions(query: string): Promise<string[]> {
-    // Simple suggestion logic based on existing data
-    const properties = await getAllProperties(100)
-    const suggestions = new Set<string>()
-
-    const normalizedQuery = query.toLowerCase()
-
-    properties.forEach((property) => {
-      if (property.provincia_catastro?.toLowerCase().includes(normalizedQuery)) {
-        suggestions.add(property.provincia_catastro)
-      }
-      if (property.municipio_catastro?.toLowerCase().includes(normalizedQuery)) {
-        suggestions.add(property.municipio_catastro)
-      }
-    })
-
-    return Array.from(suggestions).slice(0, 8)
-  }
-
-  private logSearchAnalytics(query: string, filters: any, result: any, strategy: string) {
-    // Log search metrics for analysis
+  private logSearchAnalytics(query: string, filters: SearchFilters, result: SearchResult, strategyName: string) {
     console.log("Search Analytics:", {
+      timestamp: new Date().toISOString(),
+      strategy: strategyName,
       query,
       filtersCount: Object.keys(filters).length,
-      resultsCount: result.assets?.length || 0,
-      searchTime: result.searchTime,
-      strategy,
-      timestamp: new Date().toISOString(),
+      resultsCount: result.assets.length,
+      totalReported: result.totalSize,
+      searchTimeMs: result.searchTimeMs,
+      correctedQuery: result.correctedQuery,
     })
   }
 }
