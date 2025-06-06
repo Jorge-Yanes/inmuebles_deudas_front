@@ -8,12 +8,11 @@ import { AssetDetails } from "@/components/asset-details"
 import { AssetAccessGuard } from "@/components/asset-access-guard"
 
 interface AssetPageProps {
-  params: {
-    id: string
-  }
+  params: Promise<{ id: string }>
 }
 
-export default function AssetPage({ params }: AssetPageProps) {
+export default async function AssetPage({ params }: AssetPageProps) {
+  const { id } = await params;
 
   return (
     <div className="flex flex-col gap-8 p-4 md:p-8">
@@ -30,8 +29,8 @@ export default function AssetPage({ params }: AssetPageProps) {
       </div>
 
       <Suspense fallback={<Skeleton className="h-[500px] w-full" />}>
-        <AssetAccessGuard assetId={params.id}>
-          <AssetDetails id={params.id} />
+        <AssetAccessGuard assetId={id}>
+          <AssetDetails id={id} />
         </AssetAccessGuard>
       </Suspense>
     </div>

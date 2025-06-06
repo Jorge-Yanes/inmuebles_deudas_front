@@ -8,7 +8,7 @@ import { Search, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getSearchSuggestions } from "@/lib/search"
+import { getSearchSuggestions } from "@/lib/algolia"
 import { cn } from "@/lib/utils"
 
 interface SearchBarProps {
