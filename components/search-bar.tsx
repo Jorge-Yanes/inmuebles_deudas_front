@@ -65,6 +65,7 @@ export function SearchBar({
       } catch (error) {
         console.error("Error fetching suggestions:", error)
         setSuggestions([])
+        setShowSuggestions(false)
       } finally {
         setIsLoading(false)
       }
@@ -148,18 +149,23 @@ export function SearchBar({
       </div>
 
       {/* Suggestions dropdown */}
-      {showSuggestions && suggestions.length > 0 && (
+      {showSuggestions && (
         <div className="absolute mt-1 w-full rounded-md border bg-background shadow-lg z-50">
           <ul className="py-1">
-            {suggestions.map((suggestion, index) => (
-              <li
-                key={index}
-                className="cursor-pointer px-4 py-2 hover:bg-muted"
-                onClick={() => handleSuggestionClick(suggestion)}
-              >
-                {suggestion}
-              </li>
-            ))}
+            {isLoading && <li className="px-4 py-2 text-muted-foreground text-sm">Buscando sugerencias...</li>}
+            {!isLoading && suggestions.length === 0 && query.length >= 2 && (
+              <li className="px-4 py-2 text-muted-foreground text-sm">No se encontraron sugerencias</li>
+            )}
+            {!isLoading &&
+              suggestions.map((suggestion, index) => (
+                <li
+                  key={index}
+                  className="cursor-pointer px-4 py-2 hover:bg-muted"
+                  onClick={() => handleSuggestionClick(suggestion)}
+                >
+                  {suggestion}
+                </li>
+              ))}
           </ul>
         </div>
       )}
