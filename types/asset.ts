@@ -1,5 +1,6 @@
 // Defines the comprehensive structure for a real estate asset
 export interface Asset {
+  objectID: string // Algolia's unique record identifier
   id: string // Crucial for keys and linking
   ndg?: string | null
   lien?: string | null

@@ -1,38 +1,36 @@
 "use client"
 
-import { Suspense } from "react"
-import { useSearchParams } from "next/navigation"
-import { SearchResults } from "@/components/search-results"
-import { SearchFilters } from "@/components/search-filters"
-import { Skeleton } from "@/components/ui/skeleton"
+import { InstantSearch } from "react-instantsearch-hooks-web"
+import { searchClient, ALGOLIA_INDEX_NAME } from "@/lib/algolia"
+import { AlgoliaSearchFilters } from "@/components/algolia/algolia-search-filters"
+import { AlgoliaSearchResults } from "@/components/algolia/algolia-search-results"
+import { history } from "instantsearch.js/es/lib/routers"
 
 export default function SearchPage() {
-  const searchParams = useSearchParams()
-  const query = searchParams.get("q") || ""
-  const view = searchParams.get("view") || "list"
-
   return (
-    <div className="flex flex-col md:flex-row min-h-[calc(100vh-4rem)]">
-      <div className="w-full md:w-80 lg:w-96 shrink-0 border-r bg-background">
-        <SearchFilters searchParams={searchParams} />
-      </div>
-      <div className="flex-1 overflow-auto p-4 md:p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight">
-            {query ? (
-              <>
-                Resultados para <span className="text-primary">"{query}"</span>
-              </>
-            ) : (
-              "Todos los activos inmobiliarios"
-            )}
-          </h1>
+    <InstantSearch
+      searchClient={searchClient}
+      indexName={ALGOLIA_INDEX_NAME}
+      routing={{
+        router: history({
+          // Sync search state with URL query parameters
+          getLocation() {
+            if (typeof window === "undefined") {
+              return new URL("http://localhost") as unknown as Location
+            }
+            return window.location
+          },
+        }),
+      }}
+    >
+      <div className="flex flex-col md:flex-row min-h-[calc(100vh-4rem)]">
+        <div className="w-full md:w-80 lg:w-96 shrink-0 border-r bg-background">
+          <AlgoliaSearchFilters />
         </div>
-
-        <Suspense fallback={<Skeleton className="h-[500px] w-full" />}>
-          <SearchResults query={query} view={view} searchParams={searchParams} />
-        </Suspense>
+        <div className="flex-1 overflow-auto p-4 md:p-6">
+          <AlgoliaSearchResults />
+        </div>
       </div>
-    </div>
+    </InstantSearch>
   )
 }
