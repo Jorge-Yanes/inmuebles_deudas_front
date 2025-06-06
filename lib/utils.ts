@@ -1,251 +1,170 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import type { Asset } from "@/types/asset"
-import { propertyTypeLabels, legalPhaseLabels } from "@/types/asset"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
 /**
- * Normaliza un texto eliminando acentos y diacríticos
- * Convierte: "áéíóúüñ" -> "aeiouun"
+ * Formats a number as currency.
+ * @param amount The number to format.
+ * @param currency The currency code (e.g., 'EUR', 'USD'). Defaults to 'EUR'.
+ * @param locale The locale to use for formatting. Defaults to 'es-ES'.
+ * @returns The formatted currency string.
  */
-export function normalizeText(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-}
-
-// Función para generar un título descriptivo para la propiedad
-export function generateTitle(asset: Asset): string {
-  const type = propertyTypeLabels[asset.property_type] || asset.property_type
-  const location = asset.municipio_catastro || asset.provincia_catastro || "ubicación desconocida"
-  const size = asset.superficie_construida_m2 ? `${asset.superficie_construida_m2}m²` : ""
-
-  let title = `${type} en ${location}`
-  if (size) title += ` de ${size}`
-  if (asset.rooms) title += `, ${asset.rooms} hab.`
-
-  return title
-}
-
-// Función para generar una descripción para la propiedad
-export function generateDescription(asset: Asset): string {
-  const type = propertyTypeLabels[asset.property_type] || asset.property_type
-
-  // Obtener dirección completa usando SOLO campos catastrales
-  const address = getFullAddress(asset)
-
-  let description = `${type} ubicado en ${address}, ${asset.municipio_catastro}, ${asset.provincia_catastro}.`
-
-  if (asset.superficie_construida_m2) description += ` Superficie construida de ${asset.superficie_construida_m2}m².`
-  if (asset.rooms) description += ` ${asset.rooms} habitaciones.`
-  if (asset.bathrooms) description += ` ${asset.bathrooms} baños.`
-  if (asset.extras) description += ` ${asset.extras}.`
-  if (asset.ano_construccion_inmueble && asset.ano_construccion_inmueble !== "0") {
-    description += ` Año de construcción: ${asset.ano_construccion_inmueble}.`
+export function formatCurrency(amount: number | undefined | null, currency = "EUR", locale = "es-ES"): string {
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return "N/A"
   }
-
-  if (asset.legal_phase) {
-    const phase = legalPhaseLabels[asset.legal_phase] || asset.legal_phase
-    description += ` Actualmente en fase legal: ${phase}.`
-  }
-
-  return description
-}
-
-// Función para obtener la dirección completa usando SOLO campos catastrales
-export function getFullAddress(asset: Asset): string {
-  const parts: string[] = []
-
-  // Construir dirección usando campos catastrales
-  if (asset.tipo_via_catastro && asset.nombre_via_catastro) {
-    let address = `${asset.tipo_via_catastro} ${asset.nombre_via_catastro}`
-
-    if (asset.numero_portal_catastro) {
-      address += ` ${asset.numero_portal_catastro}`
-    }
-
-    parts.push(address)
-  }
-
-  // Añadir detalles adicionales si existen
-  const details: string[] = []
-  if (asset.escalera_catastro) details.push(`Esc. ${asset.escalera_catastro}`)
-  if (asset.planta_catastro) details.push(`Planta ${asset.planta_catastro}`)
-  if (asset.puerta_catastro) details.push(`Puerta ${asset.puerta_catastro}`)
-
-  if (details.length > 0) {
-    parts.push(details.join(", "))
-  }
-
-  return parts.join(", ") || "Dirección no disponible"
-}
-
-// Función para formatear valores monetarios en euros
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("es-ES", {
+  return new Intl.NumberFormat(locale, {
     style: "currency",
-    currency: "EUR",
+    currency: currency,
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    maximumFractionDigits: 2,
   }).format(amount)
 }
 
-export function formatNumber(num: number): string {
-  return new Intl.NumberFormat("es-ES").format(num)
-}
-
-export function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("es-ES", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  }).format(date)
-}
-
-export function getPropertyType(asset: Asset): string {
-  if (asset.tipo_inmueble) return asset.tipo_inmueble
-  if (asset.property_type) return asset.property_type
-  return "Inmueble"
-}
-
-// Función para obtener la superficie como número
-export function getSuperficie(asset: Asset): string {
-  if (asset.superficie_construida_m2) {
-    return `${asset.superficie_construida_m2}`
+/**
+ * Gets a human-readable property type.
+ * @param typeCode The property type code (e.g., 'PISO', 'CASA').
+ * @returns The human-readable property type or the original code if not found.
+ */
+export function getPropertyType(typeCode: string | undefined | null): string {
+  if (!typeCode) return "Desconocido"
+  const propertyTypes: { [key: string]: string } = {
+    PISO: "Piso",
+    CASA: "Casa",
+    CHALET: "Chalet",
+    LOCAL: "Local Comercial",
+    OFICINA: "Oficina",
+    GARAJE: "Garaje",
+    TERRENO: "Terreno",
+    NAVE: "Nave Industrial",
+    // Add more types as needed
   }
-  if (asset.surface_area) {
-    return `${asset.surface_area}`
-  }
-  return "N/A"
+  return propertyTypes[typeCode.toUpperCase()] || typeCode
 }
 
-// Función para calcular el valor de mercado
-export function calculateMarketValue(asset: Asset): number {
-  const superficie = Number.parseFloat(getSuperficie(asset))
-  if (!superficie || !asset.precio_idealista_venta_m2) return 0
-  return superficie * asset.precio_idealista_venta_m2
+/**
+ * Formats a surface area.
+ * @param superficie The surface area in square meters.
+ * @returns The formatted surface area string (e.g., "120 m²").
+ */
+export function getSuperficie(superficie: number | undefined | null): string {
+  if (superficie === undefined || superficie === null || isNaN(superficie)) {
+    return "N/A"
+  }
+  return `${superficie} m²`
 }
 
-// Función para calcular el valor de alquiler de mercado
-export function calculateRentalMarketValue(asset: Asset): number {
-  const superficie = Number.parseFloat(getSuperficie(asset))
-  if (!superficie || !asset.precio_idealista_alquiler_m2) return 0
-  return superficie * asset.precio_idealista_alquiler_m2
+/**
+ * Extracts latitude and longitude for map display.
+ * Assumes asset has 'latitude' and 'longitude' or 'lat' and 'lon' or 'coordenadas_catastro'.
+ * @param asset The asset object.
+ * @returns An object with lat and lng, or null if coordinates are not found.
+ */
+export function getLocationForMap(asset: Asset | undefined | null): { lat: number; lng: number } | null {
+  if (!asset) return null
+
+  if (typeof asset.latitude === "number" && typeof asset.longitude === "number") {
+    return { lat: asset.latitude, lng: asset.longitude }
+  }
+  if (typeof (asset as any).lat === "number" && typeof (asset as any).lng === "number") {
+    return { lat: (asset as any).lat, lng: (asset as any).lng }
+  }
+  if (
+    typeof (asset as any).coordenadas_catastro?.lat === "number" &&
+    typeof (asset as any).coordenadas_catastro?.lon === "number"
+  ) {
+    return { lat: (asset as any).coordenadas_catastro.lat, lng: (asset as any).coordenadas_catastro.lon }
+  }
+  // Add more checks if coordinates are stored differently
+  return null
 }
 
-// Modificar la función getLocationForMap para priorizar los campos catastrales
-export function getLocationForMap(asset: Asset): {
-  address: string
-  postalCode: string
-  city: string
-  province: string
-  fullLocation: string
-  formattedAddress: string // Nueva propiedad para geocodificación precisa
-} {
-  const address = getFullAddress(asset)
-  const postalCode = asset.codigo_postal_catastro || asset.zip_code || ""
-  const city = asset.municipio_catastro || asset.city || ""
-  const province = asset.provincia_catastro || asset.province || ""
-
-  // Construir ubicación completa para búsqueda en mapa
-  const locationParts = [address, city, province, "España"].filter(Boolean)
-  const fullLocation = locationParts.join(", ")
-
-  // Crear dirección formateada específicamente para geocodificación precisa
-  // usando exactamente los campos solicitados en el orden adecuado
-  let formattedAddress = ""
-
-  if (asset.tipo_via_catastro && asset.nombre_via_catastro) {
-    formattedAddress += `${asset.tipo_via_catastro} ${asset.nombre_via_catastro}`
-
-    if (asset.numero_portal_catastro) {
-      formattedAddress += ` ${asset.numero_portal_catastro}`
-    }
-  }
-
-  if (asset.municipio_catastro) {
-    formattedAddress += formattedAddress ? `, ${asset.municipio_catastro}` : asset.municipio_catastro
-  }
-
-  if (asset.provincia_catastro) {
-    formattedAddress += formattedAddress ? `, ${asset.provincia_catastro}` : asset.provincia_catastro
-  }
-
-  if (asset.codigo_postal_catastro) {
-    formattedAddress += formattedAddress ? `, ${asset.codigo_postal_catastro}` : asset.codigo_postal_catastro
-  }
-
-  // Añadir país
-  formattedAddress += formattedAddress ? ", España" : "España"
-
-  return {
-    address,
-    postalCode,
-    city,
-    province,
-    fullLocation,
-    formattedAddress,
-  }
+/**
+ * Normalizes text by converting to lowercase and removing accents.
+ * @param text The text to normalize.
+ * @returns The normalized text.
+ */
+export function normalizeText(text: string | undefined | null): string {
+  if (!text) return ""
+  return text
+    .toString()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
 }
 
-export function generateGoogleMapsEmbedUrl(location: string): string {
-  const encodedLocation = encodeURIComponent(location)
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""
-
-  return `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodedLocation}&zoom=15&maptype=roadmap`
+/**
+ * Generates a URL for the Spanish Cadastre virtual office.
+ * @param cadastralReference The cadastral reference number.
+ * @returns The URL to the Sede Electrónica del Catastro.
+ */
+export function getCadastralMapUrl(cadastralReference: string | undefined | null): string {
+  if (!cadastralReference) return "#" // Or a generic search page
+  // Example URL, adjust if needed for specific query parameters
+  return `https://www1.sedecatastro.gob.es/CYCBienInmueble/OVCBienInmueble.aspx?rc1=${cadastralReference}`
 }
 
-export function getCadastralMapUrl(reference: string): string {
-  return `https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?refcat=${reference}`
-}
+/**
+ * Generates HTML content for a map marker's info window.
+ * @param asset The asset object.
+ * @returns HTML string for the info window.
+ */
+export function generateAssetInfoWindowContent(asset: Asset | undefined | null): string {
+  if (!asset) return "<p>Información no disponible</p>"
 
-export function generateAssetInfoWindowContent(asset: Asset): string {
-  const address = getFullAddress(asset)
-  const propertyType = propertyTypeLabels[asset.property_type] || asset.property_type
-  const superficie = getSuperficie(asset)
+  const addressParts = [
+    asset.tipo_via_catastro,
+    asset.nombre_via_catastro,
+    asset.numero_portal_catastro,
+    asset.bloque_catastro,
+    asset.escalera_catastro,
+    asset.planta_catastro,
+    asset.puerta_catastro,
+  ].filter(Boolean)
+  const fullAddress = addressParts.join(" ")
 
+  const price = asset.price ? formatCurrency(asset.price) : "Consultar precio"
+  const surface = asset.surface_area_m2 ? getSuperficie(asset.surface_area_m2) : ""
+
+  // Basic styling, can be enhanced
   return `
-    <div style="max-width: 300px; font-family: system-ui, -apple-system, sans-serif;">
-      <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #1f2937;">
-        ${propertyType}
-      </h3>
-      <p style="margin: 0 0 4px 0; font-size: 14px; color: #6b7280;">
-        📍 ${address}
-      </p>
-      <p style="margin: 0 0 4px 0; font-size: 14px; color: #6b7280;">
-        🏙️ ${asset.municipio_catastro}, ${asset.provincia_catastro}
-      </p>
-      ${
-        superficie !== "N/A"
-          ? `
-        <p style="margin: 0 0 4px 0; font-size: 14px; color: #6b7280;">
-          📐 ${superficie} m²
-        </p>
-      `
-          : ""
-      }
-      ${
-        asset.codigo_postal_catastro
-          ? `
-        <p style="margin: 0 0 8px 0; font-size: 14px; color: #6b7280;">
-          📮 ${asset.codigo_postal_catastro}
-        </p>
-      `
-          : ""
-      }
-      ${
-        asset.price_approx
-          ? `
-        <p style="margin: 0; font-size: 16px; font-weight: 600; color: #059669;">
-          💰 ${formatCurrency(asset.price_approx)}
-        </p>
-      `
-          : ""
-      }
+    <div style="font-family: Arial, sans-serif; font-size: 14px; max-width: 250px;">
+      <h4 style="margin: 0 0 5px 0; font-size: 16px; color: #333;">${asset.property_type ? getPropertyType(asset.property_type) : "Inmueble"}</h4>
+      ${asset.main_image_url ? `<img src="${asset.main_image_url}" alt="Imagen del inmueble" style="width:100%; max-height:120px; object-fit:cover; border-radius:4px; margin-bottom:8px;">` : ""}
+      <p style="margin: 0 0 3px 0; color: #555;">${fullAddress || "Dirección no disponible"}</p>
+      <p style="margin: 0 0 3px 0; color: #555;">${asset.municipio_catastro || ""}${asset.provincia_catastro ? `, ${asset.provincia_catastro}` : ""}</p>
+      <p style="margin: 0 0 8px 0; font-weight: bold; color: #007bff;">${price}</p>
+      ${surface ? `<p style="margin: 0; color: #555;">${surface}</p>` : ""}
+      ${asset.id ? `<a href="/assets/${asset.id}" target="_blank" style="color: #007bff; text-decoration: none; display: inline-block; margin-top: 5px;">Ver detalles</a>` : ""}
     </div>
   `
+}
+
+// You might have other utility functions here.
+// Ensure all functions that are used elsewhere are exported.
+
+// Example of a function that might be used for date formatting
+export function formatDate(
+  date: Date | string | number | undefined | null,
+  locale = "es-ES",
+  options?: Intl.DateTimeFormatOptions,
+): string {
+  if (!date) return "N/A"
+  try {
+    const dateObj = new Date(date)
+    const defaultOptions: Intl.DateTimeFormatOptions = {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      ...options,
+    }
+    return new Intl.DateTimeFormat(locale, defaultOptions).format(dateObj)
+  } catch (error) {
+    console.error("Error formatting date:", error)
+    return "Fecha inválida"
+  }
 }

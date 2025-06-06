@@ -42,7 +42,7 @@ class GoogleMapsService {
       return this._loadPromise
     }
 
-    this._loadPromise = new Promise<void>((resolve, reject) => {
+    this._loadPromise = new Promise<void>(async (resolve, reject) => {
       // Si ya está cargado, resolver inmediatamente
       if (window.google?.maps) {
         this._googleMaps = window.google.maps
@@ -51,16 +51,31 @@ class GoogleMapsService {
         return
       }
 
-      // Verificar API key
-      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+      // 1. Fetch API key from our secure server endpoint
+      let apiKey: string
+      try {
+        const response = await fetch("/api/maps/key")
+        if (!response.ok) {
+          const errorBody = await response.json()
+          throw new Error(errorBody.error || "Failed to fetch Google Maps API key")
+        }
+        const data = await response.json()
+        apiKey = data.apiKey
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error fetching API key"
+        this._error = errorMessage
+        reject(new Error(errorMessage))
+        return
+      }
+
       if (!apiKey) {
-        const error = "No se ha proporcionado una API key para Google Maps"
+        const error = "No se ha proporcionado una API key para Google Maps desde el servidor"
         this._error = error
         reject(new Error(error))
         return
       }
 
-      // Callback para cuando se cargue la API
+      // 2. Callback para cuando se cargue la API
       const callbackName = `googleMapsCallback_${Date.now()}`
       window[callbackName as keyof Window] = () => {
         if (window.google?.maps) {
@@ -76,7 +91,7 @@ class GoogleMapsService {
         delete window[callbackName as keyof Window]
       }
 
-      // Crear script para cargar la API directamente desde Google
+      // 3. Crear script para cargar la API directamente desde Google
       const script = document.createElement("script")
       script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=${callbackName}&libraries=places,geometry`
       script.async = true
