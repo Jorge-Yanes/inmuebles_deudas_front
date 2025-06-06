@@ -1,96 +1,37 @@
 export interface Asset {
-  // Identificadores
-  id: string
-  ndg: string
-  lien?: string
-  property_id?: string
-  reference_code?: string
-  parcel?: string
-  cadastral_reference?: string
-  property_idh?: string
-  property_bank_id?: string
-  alt_id1?: string
-  idufir?: string
-  id_portal_subasta?: string
-
-  // Información básica de la propiedad
-  property_type: string
-  property_general_subtype?: string
-  title?: string // Campo calculado para mostrar en la UI
-  description?: string // Campo calculado para mostrar en la UI
-
-  // Ubicación - SOLO CAMPOS CATASTRALES
-  provincia_catastro: string
-  municipio_catastro: string
-  tipo_via_catastro: string
-  nombre_via_catastro: string
-  numero_portal_catastro: string
-  escalera_catastro?: string
-  planta_catastro?: string
   puerta_catastro?: string
-  codigo_postal_catastro: string
-
-  // Características físicas - SOLO SUPERFICIE CATASTRAL
-  superficie_construida_m2: string
-  rooms?: string
-  bathrooms?: string
-  has_parking?: string
-  extras?: string
-
-  // Información financiera
-  gbv?: number
-  auction_base?: number
-  deuda?: number
-  DEUDA?: number // Campo duplicado, mantener por compatibilidad
-  auction_value?: number
-  price_approx?: number
-  price_to_brokers?: number
-  ob?: number
-  hv?: number
-  purchase_price?: number
-  uw_value?: number
-  hipoges_value_total?: number
-
-  // Información de mercado
-  precio_idealista_venta_m2?: number
+  planta_catastro?: string
+  hipoges_value_total?: number | null
+  direccion_texto_catastro?: string
+  uw_value?: number | null
   precio_idealista_alquiler_m2?: number
-
-  // Información legal
-  legal_type?: string
-  legal_phase?: string
-  tipo_procedimiento?: string
+  provincia_catastro?: string
+  numero_portal_catastro?: string
+  gbv?: number | null
+  price_to_brokers?: number | null
   fase_procedimiento?: string
-  fase_actual?: string
-
-  // Estados
-  registration_status?: string
-  working_status?: string
-  marketing_status?: string
-  marketing_suspended_reason?: string
-  estado_posesion_fisica?: string
-
-  // Fechas
-  closing_date?: Date
-  portfolio_closing_date?: Date
-  date_under_re_mgmt?: Date
-  fecha_subasta?: Date
-  fecha_cesion_remate?: Date
-
-  // Información adicional
-  campania?: string
-  portfolio?: string
-  borrower_name?: string
-  hip_under_re_mgmt?: string
-  reference_code_1?: string
+  cadastral_reference?: string
+  sqm?: number
+  municipio_catastro?: string
+  auction_base?: number | null
+  escalera_catastro?: string
+  tipo_procedimiento?: string
+  superficie_construida_m2?: string
+  tipo_via_catastro?: string
+  hv?: number | null
+  auction_value?: number
   uso_predominante_inmueble?: string
+  deuda?: number | null
+  property_type?: string
+  price_approx?: number | null
+  nombre_via_catastro?: string
+  precio_idealista_venta_m2?: number
+  purchase_price?: number | null
+  codigo_postal_catastro?: string
+  ob?: number
   ano_construccion_inmueble?: string
-
-  // Campos para UI
-  imageUrl?: string
-  features?: string[]
-  documents?: { name: string; url: string }[]
-  history?: { title: string; date: string; description: string }[]
-  createdAt: Date
+  reference_code?: string
+  DEUDA?: number | null
 }
 
 export interface AssetFilter {
