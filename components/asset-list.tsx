@@ -1,6 +1,6 @@
 "use client"
-import { AssetGridItem } from "./asset-grid-item"
-import { AssetListItem } from "./asset-list-item"
+import { AssetGridItem } from "@/components/asset-grid-item"
+import { AssetListItem } from "@/components/asset-list-item"
 import type { Asset } from "@/types/asset"
 
 interface AssetListProps {
