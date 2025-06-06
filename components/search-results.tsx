@@ -35,55 +35,55 @@ export function SearchResults({ query, view = "list", searchParams = {} }: Searc
         // Determine if any UI filters are active (excluding q and view)
         const entries = Array.from(
           // Next.js useSearchParams returns URLSearchParams-like object
-          (searchParams as any).entries()
-        ) as [string, string][];
+          (searchParams as any).entries(),
+        ) as [string, string][]
         const hasFilters = entries.some(
-          ([key, value]) => value && value !== 'ALL' && value !== 'all' && key !== 'q' && key !== 'view'
-        );
-        let results: Asset[] = [];
+          ([key, value]) => value && value !== "ALL" && value !== "all" && key !== "q" && key !== "view",
+        )
+        let results: Asset[] = []
         if (query.trim() || hasFilters) {
           // Build filters object for Vertex
-          const filters: Record<string, any> = {};
+          const filters: Record<string, any> = {}
           entries.forEach(([key, value]) => {
-            if (!value || value === 'ALL' || value === 'all') return;
-            if (key === 'q' || key === 'view') return;
-            if (key === 'propertyFeatures') {
-              filters.propertyFeatures = value.split(',');
+            if (!value || value === "ALL" || value === "all") return
+            if (key === "q" || key === "view") return
+            if (key === "propertyFeatures") {
+              filters.propertyFeatures = value.split(",")
             } else {
-              filters[key] = value;
+              filters[key] = value
             }
-          });
-          results = await searchAssets(query, filters);
+          })
+          results = await searchAssets(query, filters)
         } else {
           // No search and no filters: show recent properties
-          const allProps = await getAllProperties(50);
+          const allProps = await getAllProperties(50)
           results = allProps.sort((a, b) => {
-            const dateA = a.createdAt?.getTime() || 0;
-            const dateB = b.createdAt?.getTime() || 0;
-            return dateB - dateA;
-          });
+            const dateA = a.createdAt?.getTime() || 0
+            const dateB = b.createdAt?.getTime() || 0
+            return dateB - dateA
+          })
         }
         // Apply sorting option
-        if (sortOption === 'price') {
-          results.sort((a, b) => (a.price_approx || 0) - (b.price_approx || 0));
+        if (sortOption === "price") {
+          results.sort((a, b) => (a.price_approx || 0) - (b.price_approx || 0))
         } else if (!query.trim()) {
           // relevance default for non-text searches: by date
           results.sort((a, b) => {
-            const dateA = a.createdAt?.getTime() || 0;
-            const dateB = b.createdAt?.getTime() || 0;
-            return dateB - dateA;
-          });
+            const dateA = a.createdAt?.getTime() || 0
+            const dateB = b.createdAt?.getTime() || 0
+            return dateB - dateA
+          })
         }
-        setAssets(results);
+        setAssets(Array.isArray(results) ? results : [])
       } catch (error) {
-        console.error('Error fetching assets:', error);
-        setError('Error al cargar los activos inmobiliarios. Por favor, inténtalo de nuevo.');
+        console.error("Error fetching assets:", error)
+        setError("Error al cargar los activos inmobiliarios. Por favor, inténtalo de nuevo.")
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
-    fetchResults();
-  }, [query, searchParams, sortOption]);
+    }
+    fetchResults()
+  }, [query, searchParams, sortOption])
 
   const handleViewChange = (view: "list" | "map") => {
     setActiveView(view)
@@ -198,9 +198,7 @@ export function SearchResults({ query, view = "list", searchParams = {} }: Searc
       <Tabs value={activeView} className="w-full">
         <TabsContent value="list" className="mt-0">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-            {assets.map((asset) => (
-              <AssetGridItem key={asset.id} asset={asset} />
-            ))}
+            {Array.isArray(assets) && assets.map((asset) => <AssetGridItem key={asset.id} asset={asset} />)}
           </div>
         </TabsContent>
         <TabsContent value="map" className="mt-0">
