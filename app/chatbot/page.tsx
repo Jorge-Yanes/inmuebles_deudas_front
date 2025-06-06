@@ -69,6 +69,7 @@ const ChatbotPage = () => {
             setMessages(prevMessages => [...prevMessages, { sender: 'bot', text: 'Lo siento, ocurrió un error al procesar tu solicitud.' }]);
             setPropertyResults([]); // Clear results on error
         } finally {
+            // Ensure loading state is cleared
             setLoading(false);
         }
     };
@@ -83,41 +84,88 @@ const ChatbotPage = () => {
         }
     };
 
-    return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-            <header style={{ padding: '10px', backgroundColor: '#f0f0f0', textAlign: 'center' }}>
-                <h1>Asistente de Propiedades</h1>
-            </header>
 
-            <div style={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
+    // Basic CSS for the modern chat layout (inline styles for simplicity)
+    const layoutStyles: React.CSSProperties = {
+        display: 'flex',
+ flexDirection: 'column',
+        height: '100vh',
+ backgroundColor: '#f7f7f7', // Light grey background
+    };
+
+    const chatContainerStyles: React.CSSProperties = {
+        display: 'flex',
+ flexGrow: 1,
+ overflow: 'hidden',
+    };
+
+    const chatWindowStyles: React.CSSProperties = {
+        flex: 1,
+ display: 'flex',
+ flexDirection: 'column',
+        padding: '20px', // Increased padding
+ overflowY: 'auto',
+ backgroundColor: '#fff', // White background for chat window
+        borderRadius: '8px', // Rounded corners
+        boxShadow: '0 2px 10px rgba(0,0,0,0.05)', // Subtle shadow
+        margin: '20px', // Margin around the chat window
+    };
+
+    const messagesListStyles: React.CSSProperties = {
+ flexGrow: 1,
+ overflowY: 'auto', // Ensure scrolling within the message area
+        paddingBottom: '20px', // Add padding at the bottom for input area spacing
+};
+
+    const messageBubbleStyles = (sender: 'user' | 'bot'): React.CSSProperties => ({
+        margin: '10px 0', // Increased margin between messages
+        padding: '12px 18px', // Increased padding inside bubbles
+        borderRadius: '20px', // More rounded corners
+        maxWidth: '80%', // Increased max-width
+ alignSelf: sender === 'user' ? 'flex-end' : 'flex-start',
+ backgroundColor: sender === 'user' ? '#0b84f3' : '#e5e5ea', // Modern colors
+        color: sender === 'user' ? 'white' : '#333', // Text color
+        marginLeft: sender === 'user' ? 'auto' : '0',
+ marginRight: sender === 'bot' ? 'auto' : '0',
+ fontSize: '1rem', // Standard font size
+ lineHeight: '1.4', // Improved line height
+    });
+
+    const inputAreaStyles: React.CSSProperties = {
+ display: 'flex',
+        paddingTop: '15px', // Padding above input area
+ borderTop: '1px solid #eee', // Subtle border
+ alignItems: 'center',
+};
+
+    const textInputStyles: React.CSSProperties = {
+ flexGrow: 1,
+        padding: '12px 15px', // Increased padding
+ borderRadius: '20px', // Rounded input field
+ border: '1px solid #ccc',
+ marginRight: '10px',
+ fontSize: '1rem',
+ outline: 'none', // Remove default outline
+    };
+
+    return (
+        <div style={layoutStyles}>
+            {/* Header */}
+            {/* <header style={{ padding: '15px', backgroundColor: '#fff', textAlign: 'center', borderBottom: '1px solid #eee' }}>
+                <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#333' }}>Asistente de Propiedades</h1>
+            </header> */}
+
+            <div style={chatContainerStyles}>
                 {/* Chat Window */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '10px', overflowY: 'auto', borderRight: '1px solid #ccc' }}>
-                    <div style={{ flexGrow: 1 }}>
+                <div style={chatWindowStyles}>
+                    <div style={messagesListStyles}>
                         {messages.map((msg, index) => (
-                            <div key={index} style={{
-                                margin: '5px 0',
-                                padding: '8px 12px',
-                                borderRadius: '15px',
-                                maxWidth: '70%',
-                                alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start',
-                                backgroundColor: msg.sender === 'user' ? '#007bff' : '#e9e9eb',
-                                color: msg.sender === 'user' ? 'white' : 'black',
-                                marginLeft: msg.sender === 'user' ? 'auto' : '0',
-                                marginRight: msg.sender === 'bot' ? 'auto' : '0',
-                            }}>
+                            <div key={index} style={messageBubbleStyles(msg.sender)}>
                                 <ReactMarkdown>{msg.text}</ReactMarkdown>
                             </div>
                         ))}
                          {loading && (
-                            <div style={{
-                                margin: '5px 0',
-                                padding: '8px 12px',
-                                borderRadius: '15px',
-                                maxWidth: '70%',
-                                alignSelf: 'flex-start',
-                                backgroundColor: '#e9e9eb',
-                                color: 'black',
-                            }}>
+                            <div style={messageBubbleStyles('bot')}>
                                 Typing...
                             </div>
                         )}
@@ -125,19 +173,29 @@ const ChatbotPage = () => {
                     </div>
 
                     {/* Input Area */}
-                    <div style={{ display: 'flex', padding: '10px 0' }}>
+                    <div style={inputAreaStyles}>
                         <input
                             type="text"
                             value={input}
                             onChange={handleInputChange}
                             onKeyPress={handleKeyPress}
                             placeholder="Escribe tu consulta sobre propiedades..."
-                            style={{ flexGrow: 1, padding: '10px', borderRadius: '5px', border: '1px solid #ccc', marginRight: '10px' }}
+                            style={textInputStyles}
                             disabled={loading}
                         />
                         <button
                             onClick={handleSend}
-                            style={{ padding: '10px 20px', borderRadius: '5px', border: 'none', backgroundColor: '#007bff', color: 'white', cursor: loading ? 'not-allowed' : 'pointer' }}
+                            style={{
+                                padding: '12px 25px', // Increased padding
+                                borderRadius: '20px', // Rounded button
+                                border: 'none',
+                                backgroundColor: '#0b84f3', // Modern button color
+                                color: 'white',
+ cursor: loading ? 'not-allowed' : 'pointer',
+ fontSize: '1rem',
+ transition: 'background-color 0.2s ease', // Smooth transition
+ opacity: loading ? 0.7 : 1, // Reduced opacity when disabled
+                            }}
                             disabled={loading}
                         >
                             Enviar
@@ -146,8 +204,9 @@ const ChatbotPage = () => {
                 </div>
 
                 {/* Property Results Area */}
-                <div style={{ flex: 1, padding: '10px', overflowY: 'auto' }}>
-                    <h2>Resultados de Propiedades</h2>
+                {/* This section remains largely the same for now, as the focus was on the chat UI/UX */}
+                <div style={{ flex: 1, padding: '20px', overflowY: 'auto', backgroundColor: '#fff', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', margin: '20px' }}>
+                    <h2 style={{ marginTop: 0, marginBottom: '20px', fontSize: '1.3rem', color: '#333' }}>Resultados de Propiedades</h2>
                     {loading && propertyResults.length === 0 && (
                          <p>Buscando propiedades...</p>
                     )}
