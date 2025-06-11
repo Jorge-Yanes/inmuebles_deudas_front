@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Skeleton } from "@/components/ui/skeleton"
 import { SearchBar } from "@/components/search-bar"
 import { DashboardGreeting } from "@/components/dashboard-greeting"
+import AlgoliaDemo from "@/components/AlgoliaDemo"
 import { MostProfitableAssets } from "@/components/most-profitable-assets"
 import { AnimatedStats } from "@/components/animated-stats"
 
@@ -76,6 +77,10 @@ export default function HomePage() {
 
       <div className="mx-auto w-full">
         <SearchBar placeholder="Buscar por ubicación, tipo, precio..." />
+      </div>
+ 
+      <div className="mx-auto w-full">
+        <AlgoliaDemo />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">

@@ -2,11 +2,10 @@
 
 import { useEffect, useState, useDeferredValue } from "react"
 import { useSearchParams } from "next/navigation"
-import { useDebounce } from "use-debounce"
 import { AssetList } from "@/components/asset-list"
 import { type Asset } from "@/types/asset"
 import { AlgoliaSearchFilters } from "@/components/algolia/algolia-search-filters" // Keep filters if needed
-import { getSearchSuggestions } from "@/lib/algolia" // Import the suggestion function
+import { getSearchSuggestions, searchClient, ALGOLIA_INDEX_NAME } from "@/lib/algolia" // Import the suggestion and search functions
 
 interface SearchResponse {
   assets: Asset[]
@@ -18,49 +17,66 @@ export default function SearchPage() {
   const searchParams = useSearchParams()
   const initialSearchQuery = searchParams.get("q") || ""
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery)
-  const [debouncedSearchQuery] = useDebounce(searchQuery, 300); // Debounce for main search
   const [searchResults, setSearchResults] = useState<Asset[]>([])
   const [suggestions, setSuggestions] = useState<string[]>([]); // State for suggestions
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [debouncedSearchQueryState, setDebouncedSearchQueryState] = useState(initialSearchQuery);
+
   useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQueryState(searchQuery);
+      console.log("debouncedSearchQueryState updated:", searchQuery); // Added log
+    }, 300); // 300ms debounce delay
+
+    // Cleanup function to clear the timeout
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchQuery]); // This effect depends on searchQuery
+
+  // Effect to fetch search results when the debounced query changes
+  useEffect(() => {
+    console.log("debouncedSearchQueryState changed, fetching search results:", debouncedSearchQueryState); // Updated log
     const fetchSearchResults = async () => {
-      setLoading(true)
-      setError(null)
+      setLoading(true);
+      setError(null);
       try {
         const response = await fetch("/api/search", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ query: searchQuery }),
-        })
+          body: JSON.stringify({ query: debouncedSearchQueryState }), // Use debouncedSearchQueryState here
+        });
         if (!response.ok) {
-          throw new Error(`Error: ${response.status}`)
+          throw new Error(`Error: ${response.status}`);
         }
-        const data: SearchResponse = await response.json() // Assuming the API returns an object with 'assets'
-        setSearchResults(data.assets)
+        const data: SearchResponse = await response.json();
+        setSearchResults(data.assets);
       } catch (err: any) {
-        setError(err.message)
+        setError(err.message);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    // Only fetch main search results when the debounced query changes
-    if (debouncedSearchQuery) {
-      fetchSearchResults()
+    // Only fetch main search results when the debounced query state is not empty
+    if (debouncedSearchQueryState) {
+      fetchSearchResults();
     } else {
-      setSearchResults([])
-      setLoading(false)
+      setSearchResults([]);
+      setLoading(false);
     }
-  }, [debouncedSearchQuery])
+  }, [debouncedSearchQueryState]); // This effect now depends on debouncedSearchQueryState
+
 
   // Effect for fetching suggestions
   useEffect(() => {
+ console.log("searchQuery changed:", searchQuery);
     const fetchSuggestions = async () => {
-      if (searchQuery.length > 1) { // Fetch suggestions if query has more than 1 character
+      if (searchQuery.length > 1) { // Fetch suggestions if query has more than 1 character and not equal to debounced query
         try {
           const newSuggestions = await getSearchSuggestions(searchQuery);
           setSuggestions(newSuggestions);

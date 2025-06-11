@@ -51,7 +51,10 @@ export async function searchAssets(
   console.log("Sending search query and options to Algolia:", query, options);
  const searchParameters = { query, ...options };
   console.log("Parameters passed to index.search:", searchParameters);
-  const res = await index.search(query, searchParameters);
+ const res = await index.search(query, {
+ ...searchParameters,
+    userToken: 'dummy-user-token' // Added dummy userToken
+ });
 
 
   console.log("Received search results from Algolia:", res);
