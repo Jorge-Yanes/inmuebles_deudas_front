@@ -13,6 +13,10 @@ interface AssetPageProps {
 
 export default async function AssetPage({ params }: AssetPageProps) {
   const { id } = await params;
+  console.log("ID from params in AssetPage:", id); // Keep this for general logging
+  if (id === undefined) {
+    console.log("Params object when ID is undefined:", params);
+  }
 
   return (
     <div className="flex flex-col gap-8 p-4 md:p-8">

@@ -19,25 +19,35 @@ export const ALGOLIA_INDEX_NAME_PRICE_DESC = `${ALGOLIA_INDEX_NAME}_price_desc`
  * Devuelve hasta `hitsPerPage` sugerencias (atributo `title`) a partir de una query.
  */
 export async function getSearchSuggestions(
-  query: string,
-  hitsPerPage = 5,
+ query: string,
+  hitsPerPage = 10, // Increased hitsPerPage to potentially get more varied suggestions
 ): Promise<string[]> {console.log("getSearchSuggestions called with query:", query);
   const trimmed = query.trim();if (trimmed.length < 2) {console.log("Query too short, returning empty array.");
     return [];
   }
 
   const index = searchClient.initIndex(ALGOLIA_INDEX_NAME);console.log("Initialized Algolia index:", ALGOLIA_INDEX_NAME);
-
   console.log("Sending search query to Algolia:", trimmed);
-  const res = await index.search<{ title?: string }>(trimmed, {
+  const res = await index.search<{ provincia_catastro?: string, municipio_catastro?: string }>(trimmed, {
     hitsPerPage,
-    attributesToRetrieve: ["title"],
+ attributesToRetrieve: ["provincia_catastro", "municipio_catastro"], // Specify attributes to retrieve
   });
 
-  // Titulos únicos, sin nulos
-  return [...new Set(res.hits.map((h) => h.title).filter(Boolean) as string[])];
-console.log("Received search suggestions from Algolia:", res.hits);
-console.log("Returning unique titles:", uniqueTitles);
+  // Extract and combine province and municipality suggestions
+  const suggestions: string[] = [];
+  res.hits.forEach(hit => {
+    if (hit.provincia_catastro) {
+      suggestions.push(hit.provincia_catastro);
+    }
+    if (hit.municipio_catastro) {
+      suggestions.push(hit.municipio_catastro);
+    }
+  });
+
+  console.log("Received search suggestions from Algolia (raw hits):", res.hits);
+  const uniqueSuggestions = [...new Set(suggestions)];
+  console.log("Returning unique suggestions:", uniqueSuggestions);
+  return uniqueSuggestions;
 }
 
 export async function searchAssets(

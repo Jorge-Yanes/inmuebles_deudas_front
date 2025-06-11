@@ -302,6 +302,8 @@ function getFullAddress(asset: Asset): string {
 // Obtener una propiedad por ID
 export async function getPropertyById(id: string, user?: User | null): Promise<Asset | null> {
   try {
+    console.log(`Attempting to fetch property with ID: ${id}`)
+
     // Verificar caché primero
     if (propertyCache.has(id)) {
       const cachedData = propertyCache.get(id)!
@@ -313,12 +315,14 @@ export async function getPropertyById(id: string, user?: User | null): Promise<A
       }
     }
 
-    const propertyDoc = await getDoc(doc(db, "inmueblesMayo", id))
+    const propertyDoc = await getDoc(doc(db, "inmueblesMayo2", id))
 
-    if (!propertyDoc.exists()) {
+    const docExists = propertyDoc.exists();
+    console.log(`Document with ID ${id} exists: ${docExists}`)
+
+    if (!docExists) {
       return null
     }
-
     const asset = convertDocToAsset(propertyDoc)
 
     // Añadir a caché con timestamp
@@ -341,7 +345,7 @@ export async function getAllProperties(maxLimit = 500): Promise<Asset[]> {
     console.log("🔍 getAllProperties - Starting with limit:", maxLimit)
 
     // Consulta simple con solo un límite - sin filtrado ni ordenación
-    const propertiesQuery = query(collection(db, "inmueblesMayo"), limit(maxLimit))
+    const propertiesQuery = query(collection(db, "inmueblesMayo2"), limit(maxLimit))
     const querySnapshot = await getDocs(propertiesQuery)
 
     console.log("🔍 getAllProperties - Query snapshot size:", querySnapshot.size)
@@ -748,7 +752,7 @@ export async function getFilteredProperties(filters: Record<string, string | und
 // Obtener valores únicos para filtros
 export async function getUniqueFieldValues(field: string): Promise<string[]> {
   try {
-    const querySnapshot = await getDocs(query(collection(db, "inmueblesMayo"), limit(500)))
+    const querySnapshot = await getDocs(query(collection(db, "inmueblesMayo2"), limit(500)))
     const uniqueValues = new Set<string>()
 
     querySnapshot.forEach((doc) => {
@@ -773,7 +777,7 @@ export async function getPropertyStats(userId?: string): Promise<{
   averageValue: number
 }> {
   try {
-    const querySnapshot = await getDocs(collection(db, "inmueblesMayo"))
+    const querySnapshot = await getDocs(collection(db, "inmueblesMayo2"))
 
     let totalProperties = 0
     let totalValue = 0
@@ -928,7 +932,7 @@ export const getCities = getMunicipios
 export async function getComarcas(): Promise<string[]> {
   try {
     // Intentar obtener comarcas si el campo existe en los datos
-    const querySnapshot = await getDocs(collection(db, "inmueblesMayo"))
+    const querySnapshot = await getDocs(collection(db, "inmueblesMayo2"))
     const uniqueValues = new Set<string>()
 
     querySnapshot.forEach((doc) => {

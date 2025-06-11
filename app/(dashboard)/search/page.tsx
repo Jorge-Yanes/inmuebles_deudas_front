@@ -1,131 +1,154 @@
-"use client"
+"use client";
 
-import { useEffect, useState, useDeferredValue } from "react"
-import { useSearchParams } from "next/navigation"
-import { AssetList } from "@/components/asset-list"
-import { type Asset } from "@/types/asset"
-import { AlgoliaSearchFilters } from "@/components/algolia/algolia-search-filters" // Keep filters if needed
-import { getSearchSuggestions, searchClient, ALGOLIA_INDEX_NAME } from "@/lib/algolia" // Import the suggestion and search functions
+import { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 
-interface SearchResponse {
-  assets: Asset[]
-  totalCount: number
-  facets: any // Define a proper type for facets if needed
-}
+import {
+  InstantSearch,
+  useSearchBox,
+  useHits,
+  useInstantSearch,
+} from "react-instantsearch-hooks-web";
 
+import { searchClient, ALGOLIA_INDEX_NAME, getSearchSuggestions } from "@/lib/algolia";
+import { AlgoliaSearchFilters } from "@/components/algolia/algolia-search-filters";
+import { AssetList } from "@/components/asset-list";
+import type { Asset } from "@/types/asset";
+
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
+
+/* -------------------------------------------------------------------------- */
+/*  Página principal                                                          */
+/* -------------------------------------------------------------------------- */
 export default function SearchPage() {
-  const searchParams = useSearchParams()
-  const initialSearchQuery = searchParams.get("q") || ""
-  const [searchQuery, setSearchQuery] = useState(initialSearchQuery)
-  const [searchResults, setSearchResults] = useState<Asset[]>([])
-  const [suggestions, setSuggestions] = useState<string[]>([]); // State for suggestions
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const [debouncedSearchQueryState, setDebouncedSearchQueryState] = useState(initialSearchQuery);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearchQueryState(searchQuery);
-      console.log("debouncedSearchQueryState updated:", searchQuery); // Added log
-    }, 300); // 300ms debounce delay
-
-    // Cleanup function to clear the timeout
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [searchQuery]); // This effect depends on searchQuery
-
-  // Effect to fetch search results when the debounced query changes
-  useEffect(() => {
-    console.log("debouncedSearchQueryState changed, fetching search results:", debouncedSearchQueryState); // Updated log
-    const fetchSearchResults = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetch("/api/search", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ query: debouncedSearchQueryState }), // Use debouncedSearchQueryState here
-        });
-        if (!response.ok) {
-          throw new Error(`Error: ${response.status}`);
-        }
-        const data: SearchResponse = await response.json();
-        setSearchResults(data.assets);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    // Only fetch main search results when the debounced query state is not empty
-    if (debouncedSearchQueryState) {
-      fetchSearchResults();
-    } else {
-      setSearchResults([]);
-      setLoading(false);
-    }
-  }, [debouncedSearchQueryState]); // This effect now depends on debouncedSearchQueryState
-
-
-  // Effect for fetching suggestions
-  useEffect(() => {
- console.log("searchQuery changed:", searchQuery);
-    const fetchSuggestions = async () => {
-      if (searchQuery.length > 1) { // Fetch suggestions if query has more than 1 character and not equal to debounced query
-        try {
-          const newSuggestions = await getSearchSuggestions(searchQuery);
-          setSuggestions(newSuggestions);
-          console.log("Fetched suggestions:", newSuggestions); // Log suggestions
-        } catch (err) {
-          console.error("Error fetching suggestions:", err);
-          setSuggestions([]); // Clear suggestions on error
-        }
-      } else {
-        setSuggestions([]); // Clear suggestions if query is too short
-      }
-    };
-
-    fetchSuggestions();
-  }, [searchQuery]); // Fetch suggestions whenever searchQuery changes
-
-  if (loading) {
-    return <div>Loading search results...</div>
-  }
-
-  if (error) {
-    return <div>Error loading search results: {error}</div>
-  }
+  const params = useSearchParams();
+  const initialQuery = params.get("q") ?? "";
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   return (
-    <div className="flex flex-col md:flex-row min-h-[calc(100vh-4rem)]">
-      {/* You might want to keep the filters, depending on how you want to integrate them with the new search logic */}
-      {/*
-        <div className="w-full md:w-80 lg:w-96 shrink-0 border-r bg-background">
+    <InstantSearch
+      searchClient={searchClient}
+      indexName={ALGOLIA_INDEX_NAME}
+      initialUiState={{ [ALGOLIA_INDEX_NAME]: { query: initialQuery } }}
+      routing={false} // activa si quieres escribir en la URL
+    >
+      <SearchBoxWithSuggestions />
+
+      <div className="flex min-h-[calc(100vh-4rem)] flex-col md:flex-row">
+        {/* Filtros */}
+        <aside
+          className={`w-full shrink-0 border-r bg-background md:w-80 lg:w-96 ${
+            filtersOpen ? "block" : "hidden md:block"
+          }`}
+        >
           <AlgoliaSearchFilters />
-        </div>
-      */}
-      <div className="flex-1 overflow-auto p-4 md:p-6">
-        {searchResults.length > 0 ? (
-          // Here you might want to render the suggestions list when available
-          // For now, we are just logging them. You'll need to add UI to display them.
-          // Example:
-          // {suggestions.length > 0 && (
-          //   <ul>
-          //     {suggestions.map((suggestion, index) => (
-          //       <li key={index}>{suggestion}</li>
-          //     ))}
-          //   </ul>
-          // )}
-          <AssetList assets={searchResults} />
-        ) : (
-          <div>No results found for "{searchQuery}"</div>
-        )}
+        </aside>
+
+        {/* Resultados */}
+        <main className="flex-1 overflow-auto p-4 md:p-6">
+          <HitsPanel />
+        </main>
       </div>
+
+      {/* Botón para abrir/cerrar filtros en mobile */}
+      <Button
+        onClick={() => setFiltersOpen((p) => !p)}
+        className="fixed bottom-4 right-4 md:hidden z-50"
+      >
+        {filtersOpen ? <X className="h-4 w-4" /> : "Filtros"}
+      </Button>
+    </InstantSearch>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  SearchBox con sugerencias                                                 */
+/* -------------------------------------------------------------------------- */
+function SearchBoxWithSuggestions() {
+  const { query, refine, clear } = useSearchBox();
+  const router = useRouter();
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  /* Sincroniza la URL (shallow) */
+  useEffect(() => {
+    const path = query ? `/search?q=${encodeURIComponent(query)}` : "/search";
+    router.replace(path, { scroll: false });
+  }, [query, router]);
+
+  /* Petición de sugerencias */
+  useEffect(() => {
+    if (query.length <= 1) {
+      setSuggestions([]);
+      return;
+    }
+    getSearchSuggestions(query)
+      .then(setSuggestions)
+      .catch(() => setSuggestions([]));
+  }, [query]);
+
+  return (
+    <div className="relative border-b p-4">
+      <Input
+        placeholder="Buscar dirección, municipio, provincia…"
+        value={query}
+        onChange={(e) => refine(e.target.value)}
+        className="pr-8"
+      />
+      {query && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute right-6 top-1/2 -translate-y-1/2"
+          onClick={() => {
+            clear();
+            setSuggestions([]);
+          }}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      )}
+
+      {/* Lista de sugerencias */}
+      {suggestions.length > 0 && (
+        <ul className="absolute left-0 top-full z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-white shadow">
+          {suggestions.map((sug, i) => (
+            <li
+              key={i}
+              className="cursor-pointer px-4 py-2 hover:bg-gray-100"
+              onClick={() => {
+                refine(sug);
+                setSuggestions([]);
+              }}
+            >
+              {sug}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
-  )
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Panel de resultados (Hits)                                                */
+/* -------------------------------------------------------------------------- */
+function HitsPanel() {
+  const { hits, results, status } = useHits<Asset>();
+  const { indexUiState } = useInstantSearch();
+
+  if (status === "loading") {
+    return <div className="p-6">Cargando resultados…</div>;
+  }
+
+  if (results?.nbHits === 0) {
+    return (
+      <div className="p-6">
+        No se encontraron resultados para “{indexUiState.query || ""}”.
+      </div>
+    );
+  }
+
+  return <AssetList assets={hits} />;
 }
