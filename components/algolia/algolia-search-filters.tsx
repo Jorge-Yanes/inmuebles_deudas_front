@@ -24,11 +24,17 @@ export function AlgoliaSearchFilters() {
   const { items: propertyTypeItems, refine: refinePropertyType } = useRefinementList({
     attribute: "property_type",
   })
-  const { items: provinciaItems, refine: refineProvincia } = useRefinementList({ attribute: "provincia_catastro" })
+  const { items: provinciaItems, refine: refineProvincia } = useRefinementList({
+    attribute: "provincia_catastro",
+  })
   const { items: legalPhaseItems, refine: refineLegalPhase } = useRefinementList({ attribute: "legal_phase" })
 
-  const { start, range, refine: refinePrice } = useRange({ attribute: "price_approx" })
-  const { start: startSqm, range: rangeSqm, refine: refineSqm } = useRange({ attribute: "superficie_construida_m2" })
+  const { start, range, refine: refinePrice } = useRange({
+    attribute: "price_approx",
+  })
+  const { start: startSqm, range: rangeSqm, refine: refineSqm } = useRange({
+    attribute: "superficie_construida_m2",
+  })
 
   const { items: roomItems, refine: refineRooms } = useNumericMenu({
     attribute: "rooms",
@@ -59,7 +65,10 @@ export function AlgoliaSearchFilters() {
             <Checkbox
               id={`prop-${item.value}`}
               checked={item.isRefined}
-              onCheckedChange={() => refinePropertyType(item.value)}
+              onCheckedChange={() => {
+                console.log("Applying property type filter:", item.value)
+                refinePropertyType(item.value)
+              }}
             />
             <label
               htmlFor={`prop-${item.value}`}
@@ -73,7 +82,12 @@ export function AlgoliaSearchFilters() {
       </FilterPanel>
 
       <FilterPanel title="Provincia">
-        <Select onValueChange={(value) => refineProvincia(value)}>
+        <Select
+          onValueChange={(value) => {
+            console.log("Applying provincia filter:", value)
+            refineProvincia(value)
+          }}
+        >
           <SelectTrigger>
             <SelectValue placeholder="Todas las provincias" />
           </SelectTrigger>
@@ -88,7 +102,12 @@ export function AlgoliaSearchFilters() {
       </FilterPanel>
 
       <FilterPanel title="Fase Legal">
-        <Select onValueChange={(value) => refineLegalPhase(value)}>
+        <Select
+          onValueChange={(value) => {
+            console.log("Applying legal phase filter:", value)
+            refineLegalPhase(value)
+          }}
+        >
           <SelectTrigger>
             <SelectValue placeholder="Todas las fases" />
           </SelectTrigger>
@@ -107,12 +126,18 @@ export function AlgoliaSearchFilters() {
           <Input
             placeholder={`Mínimo (${formatCurrency(range.min)})`}
             type="number"
-            onChange={(e) => refinePrice([Number(e.target.value), start[1] ?? range.max])}
+            onChange={(e) => {
+              console.log("Applying min price filter:", e.target.value)
+              refinePrice([Number(e.target.value), start[1] ?? range.max])
+            }}
           />
           <Input
             placeholder={`Máximo (${formatCurrency(range.max)})`}
             type="number"
-            onChange={(e) => refinePrice([start[0] ?? range.min, Number(e.target.value)])}
+            onChange={(e) => {
+              console.log("Applying max price filter:", e.target.value)
+              refinePrice([start[0] ?? range.min, Number(e.target.value)])
+            }}
           />
         </div>
       </FilterPanel>
@@ -123,11 +148,18 @@ export function AlgoliaSearchFilters() {
             placeholder={`Mínimo (${rangeSqm.min})`}
             type="number"
             onChange={(e) => refineSqm([Number(e.target.value), startSqm[1] ?? rangeSqm.max])}
+            onChange={(e) => {
+              console.log("Applying min sqm filter:", e.target.value)
+              refineSqm([Number(e.target.value), startSqm[1] ?? rangeSqm.max])
+            }}
           />
           <Input
             placeholder={`Máximo (${rangeSqm.max})`}
             type="number"
-            onChange={(e) => refineSqm([startSqm[0] ?? rangeSqm.min, Number(e.target.value)])}
+            onChange={(e) => {
+              console.log("Applying max sqm filter:", e.target.value)
+              refineSqm([startSqm[0] ?? rangeSqm.min, Number(e.target.value)])
+            }}
           />
         </div>
       </FilterPanel>
@@ -139,7 +171,10 @@ export function AlgoliaSearchFilters() {
               key={item.value}
               variant={item.isRefined ? "default" : "outline"}
               className="flex-1"
-              onClick={() => refineRooms(item.value)}
+              onClick={() => {
+                console.log("Applying rooms filter:", item.value)
+                refineRooms(item.value)
+              }}
             >
               {item.label}
             </Button>

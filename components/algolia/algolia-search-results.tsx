@@ -38,6 +38,7 @@ function CustomSearchBox() {
 export function AlgoliaSearchResults() {
   const { results } = useInstantSearch()
   const { hits } = useHits<Asset>()
+  console.log("AlgoliaSearchResults - Received hits:", hits);
   const { nbHits, processingTimeMS } = useStats()
   const { refine: refineSort, options: sortOptions } = useSortBy({
     items: [

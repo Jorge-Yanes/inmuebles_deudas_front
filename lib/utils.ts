@@ -199,3 +199,20 @@ export function generateAssetInfoWindowContent(asset: Asset) {
     </div>
   `;
 }
+
+export function formatAlgoliaFilters(filters: Record<string, any>): string[] {
+  const filterStrings: string[] = [];
+
+  if (filters.property_type) {
+    filterStrings.push(`property_type:"${filters.property_type}"`);
+  }
+  if (filters.provincia_catastro) {
+    filterStrings.push(`provincia_catastro:"${filters.provincia_catastro}"`);
+  }
+  if (filters.municipio_catastro) {
+    filterStrings.push(`municipio_catastro:"${filters.municipio_catastro}"`);
+  }
+
+  // Add more filter conditions as needed
+  return filterStrings;
+}
