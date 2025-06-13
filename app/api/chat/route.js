@@ -6,23 +6,21 @@ import { v1 } from "@google-cloud/discoveryengine";
 const discoveryengineClient = new v1.SearchServiceClient();
 
 // Leemos las variables de entorno necesarias
-//const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-//const location = process.env.VERTEX_AI_LOCATION || "us-east1"; // Región por defecto
+const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+const location = process.env.VERTEX_AI_LOCATION || "us-east1"; // Región por defecto
 const firestoreDatabaseId = process.env.FIRESTORE_DATABASE_ID || "(default)";
-const projectId = 'deudas-inmobiliarias'; // Verify this is correct
 const vertexAiSearchDataStoreId = 'inmuebles_1748938854943'; // Verify this is correct
-
 import { auth } from 'google-auth-library';
 
 console.log(
-  "GOOGLE_APPLICATION_CREDENTIALS:",
-  process.env.GOOGLE_APPLICATION_CREDENTIALS
+  "GOOGLE_APPLICATION_CREDENTIALS_JSON:",
+  process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON
 );
 
 // Comprobamos si el archivo de credenciales existe si la variable está definida
-if (process.env.GOOGLE_APPLICATION_CREDENTIALS && !fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON && !fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON)) {
   console.error(
-    "❌ Archivo de credenciales no encontrado. Verifica la ruta GOOGLE_APPLICATION_CREDENTIALS."
+    "❌ Archivo de credenciales no encontrado. Verifica la ruta GOOGLE_APPLICATION_CREDENTIALS_JSON."
   );
   // Dependiendo de tu configuración, podrías querer lanzar un error fatal aquí,
   // pero por ahora solo lo registramos.
@@ -32,7 +30,7 @@ if (process.env.GOOGLE_APPLICATION_CREDENTIALS && !fs.existsSync(process.env.GOO
 if (
   !projectId ||
   !vertexAiSearchDataStoreId
-  // Eliminamos la verificación de GOOGLE_APPLICATION_CREDENTIALS como obligatoria aquí
+  // Eliminamos la verificación de GOOGLE_APPLICATION_CREDENTIALS_JSON como obligatoria aquí
   // ya que el cliente auth.getClient() debería manejar la autenticación
 ) {
   console.error("❌ Faltan variables de entorno requeridas: projectId o VERTEX_AI_SEARCH_DATA_STORE_ID.");
