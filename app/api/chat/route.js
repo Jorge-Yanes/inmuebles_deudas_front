@@ -9,22 +9,25 @@ const discoveryengineClient = new v1.SearchServiceClient();
 const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 const location = process.env.VERTEX_AI_LOCATION || "us-east1"; // Región por defecto
 const firestoreDatabaseId = process.env.FIRESTORE_DATABASE_ID || "(default)";
-const vertexAiSearchDataStoreId = 'inmuebles_1748938854943'; // Verify this is correct
+const vertexAiSearchDataStoreId = process.env.VERTEX_AI_SEARCH_DATA_STORE_ID; // Verify this is correct
 import { auth } from 'google-auth-library';
 
-console.log(
-  "GOOGLE_APPLICATION_CREDENTIALS_JSON:",
-  process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON
-);
+let credentials = null;
 
-// Comprobamos si el archivo de credenciales existe si la variable está definida
-if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON && !fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON)) {
-  console.error(
-    "❌ Archivo de credenciales no encontrado. Verifica la ruta GOOGLE_APPLICATION_CREDENTIALS_JSON."
-  );
-  // Dependiendo de tu configuración, podrías querer lanzar un error fatal aquí,
-  // pero por ahora solo lo registramos.
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+  const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON.trim();
+
+  // If it starts with “{” we assume it is the JSON, not a path
+  if (raw.startsWith("{")) {
+    credentials = JSON.parse(raw);
+  } else if (fs.existsSync(raw)) {
+    credentials = JSON.parse(fs.readFileSync(raw, "utf8"));
+  } else {
+    console.error("❌ GOOGLE_APPLICATION_CREDENTIALS_JSON no es JSON ni path válido");
+  }
 }
+
+export const gcpCredentials = credentials;
 
 // Verificamos que las variables clave estén definidas
 if (
