@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils" // Assuming you have a cn utility
+import { AssetGridItem } from "@/components/asset-grid-item"
 
 // Types
 interface ChatMessage {
@@ -192,11 +193,12 @@ const ChatbotPage = () => {
                 <p className="text-center">Los resultados de las propiedades aparecerán aquí.</p>
               </div>
             )}
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-1 gap-4">
-            {" "}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {" "}
             {/* Adjusted for better vertical fit */}
             {propertyResults.map((asset, index) => (
-              <PropertyCard key={index} property={asset} />
+              /* <PropertyCard key={index} property={asset} /> */
+              <AssetGridItem key={index} asset={asset} />
             ))}
           </div>
         </div>
