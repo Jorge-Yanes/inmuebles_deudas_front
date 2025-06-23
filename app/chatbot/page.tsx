@@ -21,11 +21,14 @@ type Asset = any // Replace with your actual Asset type
 const ChatbotPage = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState<string>("")
-  const [loading, setLoading] = useState<boolean>(false)
+  const [loading, setLoading] = useState<boolean>(false) // For initial load and sending message
+  const [loadingMore, setLoadingMore] = useState<boolean>(false) // For lazy loading
   const [propertyResults, setPropertyResults] = useState<Asset[]>([])
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
-
+  const propertyScrollAreaRef = useRef<HTMLDivElement>(null)
+  const [currentPage, setCurrentPage] = useState<number>(1)
+  const [hasMore, setHasMore] = useState<boolean>(true) // Assuming initially there might be more
+  const pageSize = 20; // Consistent with backend
   useEffect(() => {
     // A slight delay to ensure the DOM has updated before scrolling
     setTimeout(() => {
@@ -33,15 +36,25 @@ const ChatbotPage = () => {
     }, 100)
   }, [messages])
 
-  const handleSend = async () => {
+  // Effect to attach scroll listener
+  useEffect(() => {
+    const scrollElement = propertyScrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (scrollElement) {
+      scrollElement.addEventListener('scroll', handleScroll);
+      return () => scrollElement.removeEventListener('scroll', handleScroll);
+    }
+  }, [propertyResults, loading, hasMore, input]); // Re-attach if results change or state changes
+
+  /*const handleSend = async () => {
     if (input.trim() === "" || loading) return
 
     const userMessage = input.trim()
     setMessages((prevMessages) => [...prevMessages, { sender: "user", text: userMessage }])
     setInput("")
-    setLoading(true)
-    setPropertyResults([])
-
+    setLoading(true) // Set initial loading
+    setPropertyResults([]) // Clear previous results
+    setCurrentPage(1) // Reset to first page
+    setHasMore(true) // Assume there's more initially
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -62,7 +75,101 @@ const ChatbotPage = () => {
       }
 
       if (data.propertyResults && Array.isArray(data.propertyResults)) {
-        setPropertyResults(data.propertyResults)
+        setPropertyResults(data.propertyResults);
+        // Check if the number of results returned is less than the page size
+        setHasMore(data.propertyResults.length === pageSize);
+      }
+    } catch (error) {
+      console.error("Error fetching from API:", error);
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        { sender: "bot", text: "Lo siento, ocurrió un error al procesar tu solicitud." },
+      ]);
+      setPropertyResults([]);
+      setHasMore(false); // No more results on error
+    } finally {
+      setLoading(false); // Unset initial loading
+    }
+  };*/
+
+  const handleScroll = async () => {
+    const scrollElement = propertyScrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (!scrollElement || loading || loadingMore || !hasMore) return;
+
+    const { scrollTop, clientHeight, scrollHeight } = scrollElement;
+    const scrollThreshold = 100; // Load more when 100px from the bottom
+
+    if (scrollHeight - scrollTop - clientHeight < scrollThreshold) {
+      setLoadingMore(true);
+      const nextPage = currentPage + 1;
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: messages.find(msg => msg.sender === 'user')?.text || '', page: nextPage, pageSize }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`API responded with status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.propertyResults && Array.isArray(data.propertyResults)) {
+          setPropertyResults(prevResults => [...prevResults, ...data.propertyResults]);
+          setCurrentPage(nextPage);
+          setHasMore(data.propertyResults.length === pageSize);
+        } else {
+            setHasMore(false); // No more results if empty array or not array
+        }
+
+      } catch (error) {
+        console.error("Error fetching more from API:", error);
+        setHasMore(false); // Stop trying to load more on error
+      } finally {
+        setLoadingMore(false);
+      }
+    }
+  };
+
+  // Adjusted handleSend to initiate with page 1
+  const handleSend = async () => {
+    if (input.trim() === "" || loading || loadingMore) return;
+
+    const userMessage = input.trim();
+    setMessages((prevMessages) => [...prevMessages, { sender: "user", text: userMessage }]);
+    setInput("");
+    setLoading(true);
+    setPropertyResults([]); // Clear results on new query
+    setCurrentPage(1); // Reset pagination for new query
+    setHasMore(true); // Assume there's more initially
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: userMessage, page: 1, pageSize }), // Request first page
+      });
+
+      if (!response.ok) {
+        throw new Error(`API responded with status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.conversationalResponse) {
+        setMessages((prevMessages) => [...prevMessages, { sender: "bot", text: data.conversationalResponse }]);
+      } else if (data.error) {
+        setMessages((prevMessages) => [...prevMessages, { sender: "bot", text: `Error: ${data.error}` }]);
+      }
+
+      if (data.propertyResults && Array.isArray(data.propertyResults)) {
+        setPropertyResults(data.propertyResults);
+        // Check if the number of results returned is less than the page size
+        setHasMore(data.propertyResults.length === pageSize);
+      } else {
+         setPropertyResults([]);
+         setHasMore(false);
       }
     } catch (error) {
       console.error("Error fetching from API:", error)
@@ -71,6 +178,7 @@ const ChatbotPage = () => {
         { sender: "bot", text: "Lo siento, ocurrió un error al procesar tu solicitud." },
       ])
       setPropertyResults([])
+      setHasMore(false); // No more results on error
     } finally {
       setLoading(false)
     }
@@ -89,7 +197,6 @@ const ChatbotPage = () => {
 
   return (
     <div className="flex flex-col h-screen bg-slate-100 dark:bg-slate-900">
-      {/* Optional Header */}
       <header className="p-4 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shadow-sm">
         <div className="container mx-auto flex items-center justify-center">
           <MessageSquareText className="h-6 w-6 mr-2 text-sky-600" />
@@ -100,8 +207,7 @@ const ChatbotPage = () => {
       <div className="flex flex-1 overflow-hidden p-2 sm:p-4 gap-2 sm:gap-4">
         {/* Chat Panel */}
         <div className="flex flex-col w-full md:w-1/2 lg:w-2/5 bg-white dark:bg-slate-800 rounded-lg shadow-lg overflow-hidden">
-          <ScrollArea className="flex-1 p-4 sm:p-6" ref={scrollAreaRef}>
-            <div className="space-y-4">
+        <ScrollArea className="flex-1 p-4 sm:p-6" /* ref={scrollAreaRef} */>            <div className="space-y-4 relative">
               {messages.map((msg, index) => (
                 <div
                   key={index}
@@ -167,7 +273,7 @@ const ChatbotPage = () => {
         </div>
 
         {/* Property Results Panel */}
-        <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-white dark:bg-slate-800 rounded-lg shadow-lg hidden md:block">
+        <ScrollArea className="flex-1 p-4 sm:p-6 overflow-y-auto bg-white dark:bg-slate-800 rounded-lg shadow-lg hidden md:block" ref={propertyScrollAreaRef}>
           <h2 className="text-lg sm:text-xl font-semibold mb-4 text-slate-800 dark:text-slate-200">
             Resultados de Propiedades
           </h2>
@@ -194,17 +300,14 @@ const ChatbotPage = () => {
               </div>
             )}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {" "}
-            {/* Adjusted for better vertical fit */}
             {propertyResults.map((asset, index) => (
-              /* <PropertyCard key={index} property={asset} /> */
               <AssetGridItem key={index} asset={asset} />
             ))}
           </div>
-        </div>
+        </ScrollArea>
       </div>
     </div>
-  )
+  );
 }
 
 export default ChatbotPage

@@ -39,6 +39,9 @@ if (
   console.error("❌ Faltan variables de entorno requeridas: projectId o VERTEX_AI_SEARCH_DATA_STORE_ID.");
 }
 
+// Basic in-memory cache
+const apiCache = {};
+
 // 🔥 Inicializamos el cliente de Firestore (Puede que no lo necesites para este endpoint específico,
 // pero lo mantengo si lo usas en otras partes del código)
 const firestore = new Firestore({
@@ -64,7 +67,7 @@ const generativeModel = vertex_ai.getGenerativeModel({
 
 // Handler para el endpoint /api/chat (Next.js o API Route en App Router)
 export async function POST(req) {
-  const { query: userQuery } = await req.json();
+  const { query: userQuery, page = 1, pageSize = 20, ...rest } = await req.json(); // Destructure page and pageSize
 
   console.log("👤 User Query:", userQuery);
 
@@ -96,6 +99,18 @@ export async function POST(req) {
   let conversationalResponse = "Lo siento, no pude procesar tu solicitud.";
   let propertyResults = [];
  
+  // Generate a cache key based on query and pagination parameters
+  const cacheKey = JSON.stringify({ userQuery, page, pageSize });
+
+  // Check if response is in cache
+  if (apiCache[cacheKey]) {
+    console.log(`📦 Returning cached response for key: ${cacheKey}`);
+    return new Response(JSON.stringify(apiCache[cacheKey]), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   let geminiResponseJson = null; // Variable para almacenar el JSON parseado de Gemini
   let action = "clarify"; // Por defecto si algo falla con Gemini, pedimos clarificación
   let clarificationQuestion = "Por favor, ¿podrías darme más detalles sobre lo que buscas?"; // Pregunta de fallback
@@ -177,6 +192,8 @@ export async function POST(req) {
           queryExpansionSpec: { condition: "AUTO" },
           spellCorrectionSpec: { mode: "AUTO" },
           filter: filterString,
+          offset: (page - 1) * pageSize, // Calculate offset
+ pageSize: pageSize, // Use the pageSize from the request, default to 20
         };
 
 
@@ -189,6 +206,7 @@ export async function POST(req) {
           const searchResponseArray = await discoveryengineClient.search(searchRequest);
 
           // Log the full array returned by the client library
+          const searchResponse = searchResponseArray[0]; // Access the first element which contains the response
           console.log("➡️ Full array from discoveryengineClient.search:", searchResponseArray);
           
           // The actual results array is the first element of the returned array
@@ -197,7 +215,7 @@ export async function POST(req) {
           // Log the actual results array
           console.log("➡️ Actual results array:", resultsArray);
           
-          
+          const totalPropertyCount = searchResponse.totalSize || 0; // Extract total size if available
           // Filter the results array directly
           const documentResults = resultsArray.filter( // Filter the resultsArray
             (result) => result && result.document && result.document.structData
@@ -262,12 +280,12 @@ console.log(`✅ Found ${propertyResults.length} properties.`);
         const extractedConceptsSummary = geminiResponseJson.extractedConcepts && geminiResponseJson.extractedConcepts.length > 0
         ? `Key concepts identified: ${geminiResponseJson.extractedConcepts.join(', ')}.`
         : '';
+    
+    // Combine the prompts to always include search results info and total count
+    conversationalPromptForGemini = `The user\'s original request was: \"${userQuery}\". ${extractedConceptsSummary} I performed a search with the query \"${vertexAiSearchQuery}\" and found a total of ${totalPropertyCount} properties. I am displaying the first ${propertyResults.length} results. Here is the data for the first few results (up to 3) including relevant fields like location, price, rooms, property type, and any information related to concepts like profitability or investment if available in the data. Ensure the summary is concise but highlights key features relevant to the user\'s original request:\n${JSON.stringify(propertyResults.slice(0, Math.min(propertyResults.length, 3)), null, 2)}\n\nBased on the original request, the identified concepts (like \"investment\", \"profitability\", \"beach\", \"coast\"), and the search results, generate a friendly, helpful, and conversational response in **Spanish** to the user.\n- If properties were found, summarize the findings, mentioning how many properties were found in total (${totalPropertyCount} found) and that you are displaying the first ${propertyResults.length} results. Highlight relevant properties from the top results.\n- If no properties were found, inform the user and suggest trying different criteria, clarifying their needs, or asking about different areas or features, based on the concepts identified in their original query.\n- If concepts like \"investment\" or \"profitability\" were identified in the user\'s query or extracted concepts, and the search results contain relevant data, mention how these properties might be relevant for investment, referencing the data provided.\n- If the user's query was somewhat vague or could benefit from refinement, ask a clarifying question in the context of the search results (or lack thereof) to help them narrow down their options.`;
 
-    // Combine the prompts to always include search results info
-    conversationalPromptForGemini = `The user\'s original request was: \"${userQuery}\". ${extractedConceptsSummary} I performed a search with the query \"${vertexAiSearchQuery}\" and found ${
-      propertyResults.length
-    } properties. Here is the data for the first few results (up to 3) including relevant fields like location, price, rooms, property type, and any information related to concepts like profitability or investment if available in the data. Ensure the summary is concise but highlights key features relevant to the user\'s original request:\n${JSON.stringify(propertyResults.slice(0, Math.min(propertyResults.length, 3)), null, 2)}\n\nBased on the original request, the identified concepts (like \"investment\", \"profitability\", \"beach\", \"coast\"), and the search results, generate a friendly, helpful, and conversational response in **Spanish** to the user.\n- If properties were found, summarize the findings, mentioning how many properties were found, and highlight relevant properties from the top results.\n- If no properties were found, inform the user and suggest trying different criteria, clarifying their needs, or asking about different areas or features, based on the concepts identified in their original query.\n- If concepts like \"investment\" or \"profitability\" were identified in the user\'s query or extracted concepts, and the search results contain relevant data, mention how these properties might be relevant for investment, referencing the data provided.\n- If the user's query was somewhat vague or could benefit from refinement, ask a clarifying question in the context of the search results (or lack thereof) to help them narrow down their options.`;
 
+    } 
 
      console.log("➡️ Prompt for Gemini (Conversational Response):", conversationalPromptForGemini);
 
@@ -281,13 +299,20 @@ console.log(`✅ Found ${propertyResults.length} properties.`);
      console.log("💬 Conversational response generated:", conversationalResponse);
 
 
-    return new Response(
-      JSON.stringify({
+    const responseBody = {
         conversationalResponse,
         propertyResults, // Always return propertyResults
+ totalPropertyCount: totalPropertyCount, // Include total count
         action: "search", // Action will always be 'search' in this new flow
         extractedConcepts: geminiResponseJson.extractedConcepts || []
-      }),
+    };
+
+    // Store the response in cache before returning
+    apiCache[cacheKey] = responseBody;
+    console.log(`📦 Stored response in cache for key: ${cacheKey}`);
+
+    return new Response(
+      JSON.stringify(responseBody),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
